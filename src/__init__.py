@@ -1,3 +1,1 @@
-from .assistant import main
-
-__version__ = '1.0.0'
+# Este arquivo é necessário para que o Python reconheça este diretório como um pacote
