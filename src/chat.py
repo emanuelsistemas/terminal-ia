@@ -1,4 +1,5 @@
 from typing import List, Dict
+import uuid
 import openai
 from .config import MODEL_CONFIGS
 
@@ -45,57 +46,64 @@ class ChatAssistant:
         except Exception as e:
             raise ChatError(f"Erro inesperado: {str(e)}")
     
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str) -> str:
         """
         Adiciona uma mensagem ao histórico.
         
         Args:
             role (str): Papel do remetente ("system", "user" ou "assistant")
             content (str): Conteúdo da mensagem
+            
+        Returns:
+            str: ID da mensagem adicionada
         """
         try:
-            if role not in ["system", "user", "assistant"]:
-                raise ChatError(f"Papel {role} inválido")
-            
-            self.messages.append({"role": role, "content": content})
-            
+            message_id = str(uuid.uuid4())
+            message = {
+                "id": message_id,
+                "role": role,
+                "content": content
+            }
+            self.messages.append(message)
+            return message_id
         except Exception as e:
             raise ChatError(f"Erro ao adicionar mensagem: {str(e)}")
-    
-    async def get_response(self) -> str:
-        """
-        Gera uma resposta com base no histórico de mensagens.
-        
-        Returns:
-            str: Resposta gerada
-        """
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=self.messages,
-                temperature=self.config["temperature"],
-                max_tokens=self.config["max_tokens"],
-                top_p=self.config["top_p"],
-                frequency_penalty=self.config["frequency_penalty"],
-                presence_penalty=self.config["presence_penalty"]
-            )
-            
-            message = response.choices[0].message.content
-            self.add_message("assistant", message)
-            
-            return message
-            
-        except Exception as e:
-            raise ChatError(f"Erro ao gerar resposta: {str(e)}")
     
     def clear_messages(self) -> None:
         """
         Limpa o histórico de mensagens.
         """
         try:
-            self.messages = []
-            # Re-adiciona mensagem do sistema para o Deepseek
+            # Mantém apenas a mensagem do sistema se for Deepseek
             if self.provider == "deepseek":
-                self.add_message("system", "You are a helpful AI assistant.")
+                self.messages = [msg for msg in self.messages if msg["role"] == "system"]
+            else:
+                self.messages = []
         except Exception as e:
             raise ChatError(f"Erro ao limpar mensagens: {str(e)}")
+    
+    async def get_response(self) -> str:
+        """
+        Obtém uma resposta da IA baseada no histórico de mensagens.
+        
+        Returns:
+            str: Resposta da IA
+        """
+        try:
+            completion = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{
+                    "role": msg["role"],
+                    "content": msg["content"]
+                } for msg in self.messages],
+                temperature=self.config["temperature"],
+                max_tokens=self.config["max_tokens"]
+            )
+            
+            response = completion.choices[0].message.content
+            self.add_message("assistant", response)
+            
+            return response
+            
+        except Exception as e:
+            raise ChatError(f"Erro ao obter resposta: {str(e)}")

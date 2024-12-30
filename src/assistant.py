@@ -249,15 +249,16 @@ class Assistant:
                     
                     # Box para mensagem do usuário
                     print("\033[A\033[K", end="")  # Limpa a linha do input
+                    message_id = self.chat.add_message("user", user_input)
                     user_message = [
+                        f"{COLORS.LIGHT_BLACK}ID: {message_id}{COLORS.RESET}",
                         f"{COLORS.LIGHT_BLACK}{self.format_timestamp()}{COLORS.RESET}",
                         f"Você: {user_input}"
                     ]
                     print(self.create_box("\n".join(user_message), COLORS.GREEN))
                     print()  # Linha em branco após a mensagem do usuário
                     
-                    # Adiciona mensagem ao histórico
-                    self.chat.add_message("user", user_input)
+                    # Salva mensagens após input do usuário
                     await self.db.save_messages(self.chat.messages)
                     
                     # Inicia animação de loading
@@ -270,8 +271,12 @@ class Assistant:
                         # Para a animação de loading
                         self.loading.stop()
                         
-                        # Cria mensagem completa com timestamp, modelo e resposta
+                        # Pega o ID da última mensagem (resposta da IA)
+                        ai_message_id = self.chat.messages[-1]["id"]
+                        
+                        # Cria mensagem completa com ID, timestamp, modelo e resposta
                         ai_message = [
+                            f"{COLORS.LIGHT_BLACK}ID: {ai_message_id}{COLORS.RESET}",
                             f"{COLORS.LIGHT_BLACK}{self.format_timestamp()}{COLORS.RESET}",
                             f"{COLORS.LIGHT_BLACK}{self.get_model_info()}{COLORS.RESET}",
                             response
