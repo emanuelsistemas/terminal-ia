@@ -5,7 +5,6 @@ setup(
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
-        "chromadb==0.3.29",
         "groq>=0.4.2",
         "openai>=1.12.0",
         "python-dotenv>=1.0.1",
