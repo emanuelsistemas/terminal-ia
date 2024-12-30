@@ -1,109 +1,111 @@
-from typing import List, Dict
 import uuid
-import openai
-from .config import MODEL_CONFIGS
+from typing import Dict, List, Optional
+from datetime import datetime
+from groq import Groq
+from openai import OpenAI
+from .logger import setup_logger
+from .memory import ConversationMemory
+
+logger = setup_logger(__name__)
 
 class ChatError(Exception):
-    def __init__(self, message: str):
-        self.message = message
-        super().__init__(self.message)
+    pass
 
 class ChatAssistant:
     def __init__(self, api_key: str, provider: str = "groq"):
-        """
-        Inicializa o assistente de chat.
+        self.provider = provider
+        self.messages: List[Dict] = []
+        self.memory = ConversationMemory()
         
-        Args:
-            api_key (str): Chave da API do provedor
-            provider (str): Nome do provedor ("groq" ou "deepseek")
-        """
-        try:
-            if provider not in MODEL_CONFIGS:
-                raise ChatError(f"Provedor {provider} não suportado")
-            
-            self.provider = provider
-            self.config = MODEL_CONFIGS[provider]
-            self.model = self.config["model"]
-            
-            # Define a URL base baseada no provedor
-            base_url = {
-                "groq": "https://api.groq.com/openai/v1",
-                "deepseek": "https://api.deepseek.com/v1"
-            }[provider]
-            
-            self.client = openai.OpenAI(
-                api_key=api_key,
-                base_url=base_url
-            )
-            self.messages: List[Dict[str, str]] = []
-            
-            # Adiciona mensagem do sistema para o Deepseek
-            if provider == "deepseek":
-                self.add_message("system", "You are a helpful AI assistant.")
-            
-        except KeyError as e:
-            raise ChatError(f"Erro ao inicializar o chat: {str(e)}")
-        except Exception as e:
-            raise ChatError(f"Erro inesperado: {str(e)}")
+        # Configuração do cliente baseado no provedor
+        if provider == "groq":
+            self.client = Groq(api_key=api_key)
+            self.model = "mixtral-8x7b-32768"
+        elif provider == "deepseek":
+            self.client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+            self.model = "deepseek-chat"
+        else:
+            raise ChatError(f"Provedor {provider} não suportado")
+        
+        logger.info(f"Chat inicializado com provedor {provider}")
     
     def add_message(self, role: str, content: str) -> str:
-        """
-        Adiciona uma mensagem ao histórico.
-        
-        Args:
-            role (str): Papel do remetente ("system", "user" ou "assistant")
-            content (str): Conteúdo da mensagem
-            
-        Returns:
-            str: ID da mensagem adicionada
-        """
-        try:
-            message_id = str(uuid.uuid4())
-            message = {
-                "id": message_id,
-                "role": role,
-                "content": content
-            }
-            self.messages.append(message)
-            return message_id
-        except Exception as e:
-            raise ChatError(f"Erro ao adicionar mensagem: {str(e)}")
+        """Adiciona uma mensagem ao histórico e retorna seu ID"""
+        message_id = str(uuid.uuid4())
+        message = {
+            "id": message_id,
+            "role": role,
+            "content": content,
+            "timestamp": datetime.now().isoformat()
+        }
+        self.messages.append(message)
+        return message_id
     
-    def clear_messages(self) -> None:
-        """
-        Limpa o histórico de mensagens.
-        """
-        try:
-            # Mantém apenas a mensagem do sistema se for Deepseek
-            if self.provider == "deepseek":
-                self.messages = [msg for msg in self.messages if msg["role"] == "system"]
-            else:
-                self.messages = []
-        except Exception as e:
-            raise ChatError(f"Erro ao limpar mensagens: {str(e)}")
+    def clear_messages(self):
+        """Limpa o histórico de mensagens"""
+        self.messages = []
     
     async def get_response(self) -> str:
-        """
-        Obtém uma resposta da IA baseada no histórico de mensagens.
-        
-        Returns:
-            str: Resposta da IA
-        """
+        """Obtém resposta da IA para o histórico atual"""
         try:
-            completion = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{
-                    "role": msg["role"],
-                    "content": msg["content"]
-                } for msg in self.messages],
-                temperature=self.config["temperature"],
-                max_tokens=self.config["max_tokens"]
-            )
+            if not self.messages:
+                raise ChatError("Nenhuma mensagem no histórico")
             
-            response = completion.choices[0].message.content
+            # Obtém contexto relevante da memória
+            last_message = self.messages[-1]["content"]
+            context = await self.memory.get_relevant_context(last_message)
+            
+            # Prepara o prompt com contexto
+            system_prompt = [
+                "Você é um assistente útil e amigável.",
+                "Contexto relevante da conversa:",
+                *context,
+                "Use este contexto para manter consistência nas respostas.",
+                "Se não houver contexto relevante, responda com base no seu conhecimento geral."
+            ]
+            
+            # Adiciona mensagem do sistema com contexto
+            messages_with_context = [
+                {"role": "system", "content": "\n".join(system_prompt)}
+            ]
+            
+            # Adiciona últimas mensagens do histórico
+            messages_with_context.extend([
+                {"role": msg["role"], "content": msg["content"]}
+                for msg in self.messages[-5:]
+            ])
+            
+            # Obtém resposta do modelo
+            if self.provider == "groq":
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages_with_context,
+                    temperature=0.7,
+                    max_tokens=4096,
+                    top_p=1,
+                    stream=False
+                )
+                response = completion.choices[0].message.content
+            
+            elif self.provider == "deepseek":
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages_with_context,
+                    temperature=0.7,
+                    max_tokens=4096,
+                    top_p=1,
+                    stream=False
+                )
+                response = completion.choices[0].message.content
+            
+            # Adiciona resposta ao histórico
             self.add_message("assistant", response)
+            
+            # Adiciona mensagem à memória
+            await self.memory.add_message(self.messages[-1])
             
             return response
             
         except Exception as e:
+            logger.error(f"Erro ao obter resposta: {str(e)}")
             raise ChatError(f"Erro ao obter resposta: {str(e)}")
