@@ -22,21 +22,6 @@ class ChatAssistant:
         
         logger.info(f"Chat Assistant inicializado com provedor {provider}")
     
-    async def initialize(self):
-        """Inicializa o assistente"""
-        try:
-            # Garante que o diretório de dados existe
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
-            
-            # Carrega mensagens existentes
-            self._load_messages()
-            
-            logger.info("Chat Assistant inicializado com sucesso")
-            
-        except Exception as e:
-            logger.error(f"Erro ao inicializar Chat Assistant: {str(e)}")
-            raise ChatError(f"Erro ao inicializar: {str(e)}")
-    
     def _load_messages(self):
         """Carrega mensagens do arquivo"""
         try:
@@ -50,6 +35,9 @@ class ChatAssistant:
     def _save_messages(self):
         """Salva mensagens no arquivo"""
         try:
+            # Garante que o diretório existe
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            
             with open(self.messages_file, "w", encoding="utf-8") as f:
                 json.dump(self.messages, f, ensure_ascii=False, indent=2)
         except Exception as e:
@@ -66,7 +54,7 @@ class ChatAssistant:
         self.messages.append(message)
         self._save_messages()
     
-    async def get_response(self) -> str:
+    def get_response(self) -> str:
         """Obtém resposta do modelo"""
         try:
             if self.provider == "groq":
@@ -132,7 +120,7 @@ class ChatAssistant:
             logger.error(f"Erro ao obter resposta: {str(e)}")
             raise ChatError(f"Erro ao obter resposta: {str(e)}")
     
-    async def clear_messages(self):
+    def clear_messages(self):
         """Limpa o histórico de mensagens"""
         try:
             self.messages = []
