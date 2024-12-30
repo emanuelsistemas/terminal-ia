@@ -10,11 +10,10 @@ logger = setup_logger(__name__)
 
 class ConversationMemory:
     def __init__(self):
-        # Configuração do ChromaDB
-        self.client = chromadb.Client(Settings(
-            chroma_db_impl="duckdb+parquet",
-            persist_directory=str(DATA_DIR / "chroma_db")
-        ))
+        # Nova configuração do ChromaDB
+        self.client = chromadb.PersistentClient(
+            path=str(DATA_DIR / "chroma_db")
+        )
         
         # Função de embedding - usando o modelo all-MiniLM-L6-v2
         self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
@@ -108,9 +107,6 @@ class ConversationMemory:
                     metadatas=[metadata],
                     ids=[message["id"]]
                 )
-            
-            # Persiste as alterações
-            self.client.persist()
             
             logger.info(f"Mensagem {message['id']} adicionada à memória")
             
@@ -251,9 +247,6 @@ class ConversationMemory:
             self.short_term.delete(ids=self.short_term.get()['ids'])
             self.long_term.delete(ids=self.long_term.get()['ids'])
             self.permanent.delete(ids=self.permanent.get()['ids'])
-            
-            # Persiste as alterações
-            self.client.persist()
             
             logger.info("Memória limpa com sucesso")
         except Exception as e:
