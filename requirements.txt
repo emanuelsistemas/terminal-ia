@@ -1,3 +1,5 @@
-openai>=1.0.0
-python-dotenv==1.0.0
-pytz==2023.3
+chromadb>=0.4.22
+groq>=0.4.2
+openai>=1.12.0
+python-dotenv>=1.0.1
+sentence-transformers>=2.2.2
