@@ -9,10 +9,11 @@ from .config import DATA_DIR
 logger = setup_logger(__name__)
 
 class Database:
-    def __init__(self):
+    def __init__(self, max_checkpoints: int = 10):
         self.messages_file = DATA_DIR / "messages.json"
         self.checkpoints_dir = DATA_DIR / "checkpoints"
         self.messages: List[Dict] = []
+        self.max_checkpoints = max_checkpoints
         logger.info("Database inicializado com sucesso")
 
     async def initialize(self):
@@ -29,9 +30,28 @@ class Database:
             else:
                 self.messages = []
                 logger.info("Arquivo de mensagens não encontrado, iniciando vazio")
+            
+            # Limpar checkpoints antigos na inicialização
+            await self.cleanup_old_checkpoints()
+            
         except Exception as e:
             logger.error(f"Erro ao inicializar database: {str(e)}")
             raise
+
+    async def cleanup_old_checkpoints(self):
+        """Remove os checkpoints mais antigos mantendo apenas max_checkpoints"""
+        try:
+            checkpoints = list(self.checkpoints_dir.glob("*.json"))
+            if len(checkpoints) > self.max_checkpoints:
+                # Ordena por data de modificação, mais antigos primeiro
+                checkpoints.sort(key=lambda x: x.stat().st_mtime)
+                
+                # Remove os mais antigos
+                for checkpoint in checkpoints[:-self.max_checkpoints]:
+                    checkpoint.unlink()
+                    logger.info(f"Checkpoint removido: {checkpoint.name}")
+        except Exception as e:
+            logger.error(f"Erro ao limpar checkpoints antigos: {str(e)}")
 
     async def save_messages(self, messages: List[Dict]):
         try:
@@ -49,12 +69,15 @@ class Database:
             with open(self.messages_file, "w", encoding="utf-8") as f:
                 json.dump(messages, f, ensure_ascii=False, indent=2)
             
-            # Criar checkpoint
+            # Criar checkpoint apenas para mensagens da IA
             if messages and messages[-1]["role"] == "assistant":
                 checkpoint_file = self.checkpoints_dir / f"{messages[-1]['id']}.json"
                 with open(checkpoint_file, "w", encoding="utf-8") as f:
                     json.dump(messages, f, ensure_ascii=False, indent=2)
                 logger.info(f"Checkpoint criado: {messages[-1]['id']}")
+                
+                # Limpa checkpoints antigos após criar um novo
+                await self.cleanup_old_checkpoints()
             
             logger.info(f"Salvas {len(messages)} mensagens no arquivo")
         except Exception as e:
@@ -80,7 +103,9 @@ class Database:
     async def list_checkpoints(self) -> List[Dict]:
         try:
             checkpoints = []
-            for file in self.checkpoints_dir.glob("*.json"):
+            for file in sorted(self.checkpoints_dir.glob("*.json"), 
+                             key=lambda x: x.stat().st_mtime, 
+                             reverse=True):
                 with open(file, "r", encoding="utf-8") as f:
                     messages = json.load(f)
                     last_message = messages[-1]
@@ -89,7 +114,7 @@ class Database:
                         "timestamp": last_message["timestamp"],
                         "content": last_message["content"][:100] + "..." if len(last_message["content"]) > 100 else last_message["content"]
                     })
-            return sorted(checkpoints, key=lambda x: x["timestamp"], reverse=True)
+            return checkpoints
         except Exception as e:
             logger.error(f"Erro ao listar checkpoints: {str(e)}")
             return []
