@@ -1,8 +1,6 @@
 from typing import List, Dict, Optional
 from datetime import datetime
 import chromadb
-from chromadb.config import Settings
-from chromadb.utils import embedding_functions
 from .config import DATA_DIR
 from .logger import setup_logger
 
@@ -10,14 +8,9 @@ logger = setup_logger(__name__)
 
 class ConversationMemory:
     def __init__(self):
-        # Nova configuração do ChromaDB
+        # Configuração simplificada do ChromaDB
         self.client = chromadb.PersistentClient(
             path=str(DATA_DIR / "chroma_db")
-        )
-        
-        # Função de embedding - usando o modelo all-MiniLM-L6-v2
-        self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
         )
         
         # Coleções para diferentes tipos de memória
@@ -36,18 +29,15 @@ class ConversationMemory:
         try:
             # Cria ou recupera coleções
             self.short_term = self.client.get_or_create_collection(
-                name="short_term_memory",
-                embedding_function=self.embedding_function
+                name="short_term_memory"
             )
             
             self.long_term = self.client.get_or_create_collection(
-                name="long_term_memory",
-                embedding_function=self.embedding_function
+                name="long_term_memory"
             )
             
             self.permanent = self.client.get_or_create_collection(
-                name="permanent_memory",
-                embedding_function=self.embedding_function
+                name="permanent_memory"
             )
             
             logger.info("Coleções de memória inicializadas com sucesso")
