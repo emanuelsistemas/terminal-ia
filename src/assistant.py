@@ -13,6 +13,7 @@ import unicodedata
 
 from .chat import ChatAssistant, ChatError
 from .config import COLORS
+from .database import Database
 
 class LoadingAnimation:
     def __init__(self):
@@ -45,6 +46,7 @@ class LoadingAnimation:
 class Assistant:
     def __init__(self):
         self.chat: Optional[ChatAssistant] = None
+        self.db = Database()
         self.running = True
         self.loading = LoadingAnimation()
         signal.signal(signal.SIGINT, self.signal_handler)
@@ -161,8 +163,13 @@ class Assistant:
                 raise ChatError(f"Chave de API do {provider} não encontrada")
             
             self.chat = ChatAssistant(api_key=api_key, provider=provider)
+            await self.db.initialize()
             
-            print("\nAssistente iniciado. Digite 'sair' para encerrar ou 'limpar' para limpar o histórico.\n")
+            print("\nAssistente iniciado. Digite:")
+            print("- 'sair' para encerrar")
+            print("- 'limpar' para limpar o histórico")
+            print("- '!restore ID' para restaurar um checkpoint")
+            print("- '!list' para listar checkpoints\n")
             
         except Exception as e:
             print(f"Erro: {str(e)}")
@@ -182,6 +189,28 @@ class Assistant:
         sys.stdout.write("Você: ")
         sys.stdout.flush()
         return input().strip()
+    
+    async def handle_restore(self, message_id: str):
+        messages = await self.db.restore_checkpoint(message_id)
+        if messages:
+            self.chat.messages = messages
+            await self.db.save_messages(messages)
+            print(f"\nCheckpoint {message_id} restaurado com sucesso!")
+        else:
+            print(f"\nErro: Checkpoint {message_id} não encontrado")
+    
+    async def handle_list_checkpoints(self):
+        checkpoints = await self.db.list_checkpoints()
+        if checkpoints:
+            print("\nCheckpoints disponíveis:")
+            for cp in checkpoints:
+                timestamp = datetime.fromisoformat(cp["timestamp"]).strftime("%d/%m/%Y %H:%M:%S")
+                print(f"ID: {cp['id']}")
+                print(f"Data: {timestamp}")
+                print(f"Mensagem: {cp['content']}")
+                print("-" * 50)
+        else:
+            print("\nNenhum checkpoint encontrado")
     
     async def run(self):
         try:
@@ -205,7 +234,17 @@ class Assistant:
                     
                     if user_input.lower() == "limpar":
                         self.chat.clear_messages()
+                        await self.db.save_messages([])
                         print("\nHistórico limpo.")
+                        continue
+                    
+                    if user_input.lower() == "!list":
+                        await self.handle_list_checkpoints()
+                        continue
+                    
+                    if user_input.lower().startswith("!restore "):
+                        message_id = user_input[9:].strip()
+                        await self.handle_restore(message_id)
                         continue
                     
                     # Box para mensagem do usuário
@@ -216,7 +255,10 @@ class Assistant:
                     ]
                     print(self.create_box("\n".join(user_message), COLORS.GREEN))
                     print()  # Linha em branco após a mensagem do usuário
+                    
+                    # Adiciona mensagem ao histórico
                     self.chat.add_message("user", user_input)
+                    await self.db.save_messages(self.chat.messages)
                     
                     # Inicia animação de loading
                     self.loading.start()
@@ -237,6 +279,9 @@ class Assistant:
                         
                         # Mostra box com todas as informações
                         print(self.create_box("\n".join(ai_message), COLORS.BLUE))
+                        
+                        # Salva mensagens após resposta da IA
+                        await self.db.save_messages(self.chat.messages)
                         
                     except Exception as e:
                         # Para a animação de loading em caso de erro
@@ -262,6 +307,7 @@ class Assistant:
         finally:
             # Garante que a animação de loading seja parada
             self.loading.stop()
+            await self.db.close()
 
 async def main():
     assistant = Assistant()
