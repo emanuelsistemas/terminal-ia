@@ -5,6 +5,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 from .logger import setup_logger
 from .config import DATA_DIR
+from .backup import SystemBackup
 
 logger = setup_logger(__name__)
 
@@ -14,6 +15,7 @@ class Database:
         self.checkpoints_dir = DATA_DIR / "checkpoints"
         self.messages: List[Dict] = []
         self.max_checkpoints = max_checkpoints
+        self.system_backup = SystemBackup(max_checkpoints)
         logger.info("Database inicializado com sucesso")
 
     async def initialize(self):
@@ -50,6 +52,10 @@ class Database:
                 for checkpoint in checkpoints[:-self.max_checkpoints]:
                     checkpoint.unlink()
                     logger.info(f"Checkpoint removido: {checkpoint.name}")
+            
+            # Limpa backups antigos do sistema
+            self.system_backup.cleanup_old_backups()
+            
         except Exception as e:
             logger.error(f"Erro ao limpar checkpoints antigos: {str(e)}")
 
@@ -69,14 +75,20 @@ class Database:
             with open(self.messages_file, "w", encoding="utf-8") as f:
                 json.dump(messages, f, ensure_ascii=False, indent=2)
             
-            # Criar checkpoint apenas para mensagens da IA
+            # Criar checkpoint e backup do sistema apenas para mensagens da IA
             if messages and messages[-1]["role"] == "assistant":
-                checkpoint_file = self.checkpoints_dir / f"{messages[-1]['id']}.json"
+                message_id = messages[-1]["id"]
+                
+                # Salva checkpoint simples
+                checkpoint_file = self.checkpoints_dir / f"{message_id}.json"
                 with open(checkpoint_file, "w", encoding="utf-8") as f:
                     json.dump(messages, f, ensure_ascii=False, indent=2)
-                logger.info(f"Checkpoint criado: {messages[-1]['id']}")
+                logger.info(f"Checkpoint criado: {message_id}")
                 
-                # Limpa checkpoints antigos após criar um novo
+                # Cria backup completo do sistema
+                self.system_backup.create_backup(message_id, messages)
+                
+                # Limpa checkpoints e backups antigos após criar novos
                 await self.cleanup_old_checkpoints()
             
             logger.info(f"Salvas {len(messages)} mensagens no arquivo")
@@ -86,6 +98,13 @@ class Database:
 
     async def restore_checkpoint(self, message_id: str) -> Optional[List[Dict]]:
         try:
+            # Tenta restaurar backup completo do sistema primeiro
+            messages = self.system_backup.restore_backup(message_id)
+            if messages:
+                logger.info(f"Backup do sistema restaurado: {message_id}")
+                return messages
+            
+            # Se não encontrar backup completo, tenta checkpoint simples
             checkpoint_file = self.checkpoints_dir / f"{message_id}.json"
             if not checkpoint_file.exists():
                 logger.error(f"Checkpoint não encontrado: {message_id}")
@@ -94,7 +113,7 @@ class Database:
             with open(checkpoint_file, "r", encoding="utf-8") as f:
                 messages = json.load(f)
             
-            logger.info(f"Checkpoint restaurado: {message_id}")
+            logger.info(f"Checkpoint simples restaurado: {message_id}")
             return messages
         except Exception as e:
             logger.error(f"Erro ao restaurar checkpoint: {str(e)}")
@@ -102,19 +121,39 @@ class Database:
 
     async def list_checkpoints(self) -> List[Dict]:
         try:
-            checkpoints = []
+            # Lista backups completos do sistema
+            system_backups = self.system_backup.list_backups()
+            
+            # Lista checkpoints simples
+            simple_checkpoints = []
             for file in sorted(self.checkpoints_dir.glob("*.json"), 
                              key=lambda x: x.stat().st_mtime, 
                              reverse=True):
                 with open(file, "r", encoding="utf-8") as f:
                     messages = json.load(f)
                     last_message = messages[-1]
-                    checkpoints.append({
+                    simple_checkpoints.append({
                         "id": last_message["id"],
                         "timestamp": last_message["timestamp"],
-                        "content": last_message["content"][:100] + "..." if len(last_message["content"]) > 100 else last_message["content"]
+                        "content": last_message["content"][:100] + "..." 
+                            if len(last_message["content"]) > 100 
+                            else last_message["content"],
+                        "type": "simple"
                     })
-            return checkpoints
+            
+            # Combina os dois tipos de backup
+            all_backups = [{
+                **backup,
+                "type": "system",
+                "content": backup.pop("last_message")
+            } for backup in system_backups]
+            
+            all_backups.extend(simple_checkpoints)
+            
+            # Ordena por timestamp, mais recentes primeiro
+            return sorted(all_backups, 
+                         key=lambda x: datetime.fromisoformat(x["timestamp"]), 
+                         reverse=True)
         except Exception as e:
             logger.error(f"Erro ao listar checkpoints: {str(e)}")
             return []
