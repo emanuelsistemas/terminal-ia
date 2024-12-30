@@ -1,8 +1,7 @@
-from typing import List, Dict, Optional
+from typing import List, Dict
 from datetime import datetime
 import uuid
 import json
-from pathlib import Path
 from .config import DATA_DIR
 from .logger import setup_logger
 
@@ -28,6 +27,7 @@ class ChatAssistant:
             if self.messages_file.exists():
                 with open(self.messages_file, "r", encoding="utf-8") as f:
                     self.messages = json.load(f)
+                logger.info(f"Carregadas {len(self.messages)} mensagens do histórico")
         except Exception as e:
             logger.error(f"Erro ao carregar mensagens: {str(e)}")
             self.messages = []
@@ -40,6 +40,7 @@ class ChatAssistant:
             
             with open(self.messages_file, "w", encoding="utf-8") as f:
                 json.dump(self.messages, f, ensure_ascii=False, indent=2)
+            logger.info(f"Salvas {len(self.messages)} mensagens no histórico")
         except Exception as e:
             logger.error(f"Erro ao salvar mensagens: {str(e)}")
     
@@ -53,11 +54,13 @@ class ChatAssistant:
         }
         self.messages.append(message)
         self._save_messages()
+        logger.info(f"Adicionada mensagem de {role} ao histórico")
     
     def get_response(self) -> str:
         """Obtém resposta do modelo"""
         try:
             if self.provider == "groq":
+                logger.info("Obtendo resposta do Groq...")
                 from groq import Groq
                 client = Groq(api_key=self.api_key)
                 
@@ -80,10 +83,12 @@ class ChatAssistant:
                 # Extrai e salva a resposta
                 response = chat_completion.choices[0].message.content
                 self.add_message("assistant", response)
+                logger.info("Resposta do Groq obtida com sucesso")
                 
                 return response
                 
             elif self.provider == "deepseek":
+                logger.info("Obtendo resposta do Deepseek...")
                 from openai import OpenAI
                 
                 client = OpenAI(
@@ -110,6 +115,7 @@ class ChatAssistant:
                 # Extrai e salva a resposta
                 response = chat_completion.choices[0].message.content
                 self.add_message("assistant", response)
+                logger.info("Resposta do Deepseek obtida com sucesso")
                 
                 return response
             

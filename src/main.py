@@ -1,4 +1,3 @@
-import asyncio
 import os
 from dotenv import load_dotenv
 from .chat import ChatAssistant, ChatError
@@ -74,6 +73,7 @@ def main():
                     print("\nAté logo!")
                     break
                 elif user_input.lower() == "limpar":
+                    chat.clear_messages()
                     print("\nHistórico limpo!\n")
                     continue
                 elif not user_input:
