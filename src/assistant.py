@@ -16,17 +16,18 @@ from .config import COLORS
 from .database import Database
 
 class LoadingAnimation:
-    def __init__(self):
+    def __init__(self, message: str = "Processando"):
         self.is_running = False
         self.thread = None
         self.frames = [
             "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"
         ]
         self.current_frame = 0
+        self.message = message
 
     def animate(self):
         while self.is_running:
-            sys.stdout.write(f"\r{COLORS.BLUE}Processando {self.frames[self.current_frame]}{COLORS.RESET}")
+            sys.stdout.write(f"\r{COLORS.BLUE}{self.message} {self.frames[self.current_frame]}{COLORS.RESET}")
             sys.stdout.flush()
             self.current_frame = (self.current_frame + 1) % len(self.frames)
             time.sleep(0.1)
@@ -191,26 +192,60 @@ class Assistant:
         return input().strip()
     
     async def handle_restore(self, message_id: str):
-        messages = await self.db.restore_checkpoint(message_id)
-        if messages:
-            self.chat.messages = messages
-            await self.db.save_messages(messages)
-            print(f"\nCheckpoint {message_id} restaurado com sucesso!")
-        else:
-            print(f"\nErro: Checkpoint {message_id} não encontrado")
+        # Cria um loading específico para restauração
+        loading = LoadingAnimation("Restaurando checkpoint")
+        loading.start()
+        
+        try:
+            messages = await self.db.restore_checkpoint(message_id)
+            loading.stop()
+            
+            if messages:
+                self.chat.messages = messages
+                await self.db.save_messages(messages)
+                print(f"\nCheckpoint {message_id} restaurado com sucesso!")
+                
+                # Mostra a última mensagem restaurada
+                if messages:
+                    last_message = messages[-1]
+                    restored_message = [
+                        f"{COLORS.LIGHT_BLACK}ID: {last_message['id']}{COLORS.RESET}",
+                        f"{COLORS.LIGHT_BLACK}{self.format_timestamp()}{COLORS.RESET}",
+                        f"{COLORS.LIGHT_BLACK}Estado restaurado até:{COLORS.RESET}",
+                        last_message["content"]
+                    ]
+                    print(self.create_box("\n".join(restored_message), COLORS.YELLOW))
+            else:
+                print(f"\nErro: Checkpoint {message_id} não encontrado")
+        except Exception as e:
+            loading.stop()
+            print(f"\nErro ao restaurar checkpoint: {str(e)}")
     
     async def handle_list_checkpoints(self):
-        checkpoints = await self.db.list_checkpoints()
-        if checkpoints:
-            print("\nCheckpoints disponíveis:")
-            for cp in checkpoints:
-                timestamp = datetime.fromisoformat(cp["timestamp"]).strftime("%d/%m/%Y %H:%M:%S")
-                print(f"ID: {cp['id']}")
-                print(f"Data: {timestamp}")
-                print(f"Mensagem: {cp['content']}")
-                print("-" * 50)
-        else:
-            print("\nNenhum checkpoint encontrado")
+        # Cria um loading específico para listagem
+        loading = LoadingAnimation("Carregando checkpoints")
+        loading.start()
+        
+        try:
+            checkpoints = await self.db.list_checkpoints()
+            loading.stop()
+            
+            if checkpoints:
+                print("\nCheckpoints disponíveis:")
+                for cp in checkpoints:
+                    timestamp = datetime.fromisoformat(cp["timestamp"]).strftime("%d/%m/%Y %H:%M:%S")
+                    print(f"ID: {cp['id']}")
+                    print(f"Data: {timestamp}")
+                    print(f"Tipo: {cp['type']}")
+                    if cp['type'] == 'system':
+                        print(f"Python: {cp.get('python_version', 'N/A')}")
+                    print(f"Mensagem: {cp['content']}")
+                    print("-" * 50)
+            else:
+                print("\nNenhum checkpoint encontrado")
+        except Exception as e:
+            loading.stop()
+            print(f"\nErro ao listar checkpoints: {str(e)}")
     
     async def run(self):
         try:
