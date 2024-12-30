@@ -1,34 +1,20 @@
 import logging
-import os
-from datetime import datetime
+import sys
 
 def setup_logger(name):
+    """Configura um logger básico que escreve no stdout"""
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
     
-    # Cria o diretório de logs se não existir
-    log_dir = "logs"
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+    # Cria um handler para stdout
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.INFO)
     
-    # Define o nome do arquivo de log com a data atual
-    log_file = os.path.join(log_dir, f"{datetime.now().strftime('%Y-%m-%d')}.log")
+    # Formata a mensagem
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
     
-    # Configura o handler para arquivo
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setLevel(logging.INFO)
-    
-    # Define o formato do log
-    formatter = logging.Formatter(
-        "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)d] %(message)s",
-        "%Y-%m-%d %H:%M:%S"
-    )
-    file_handler.setFormatter(formatter)
-    
-    # Remove handlers existentes para evitar duplicação
-    logger.handlers = []
-    
-    # Adiciona apenas o handler de arquivo
-    logger.addHandler(file_handler)
+    # Adiciona o handler ao logger
+    logger.addHandler(handler)
     
     return logger
