@@ -8,9 +8,11 @@ logger = setup_logger(__name__)
 
 class ConversationMemory:
     def __init__(self):
-        # Configuração simplificada do ChromaDB
-        self.client = chromadb.PersistentClient(
-            path=str(DATA_DIR / "chroma_db")
+        # Configuração do ChromaDB com versão 0.3.29
+        self.client = chromadb.Client(
+            chromadb.config.Settings(
+                persist_directory=str(DATA_DIR / "chroma_db")
+            )
         )
         
         # Coleções para diferentes tipos de memória
