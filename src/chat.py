@@ -29,6 +29,25 @@ class ChatAssistant:
         
         logger.info(f"Chat inicializado com provedor {provider}")
     
+    async def initialize(self):
+        """Inicializa o chat e carrega o contexto da memória"""
+        try:
+            # Inicializa a memória
+            await self.memory.initialize()
+            
+            # Carrega mensagens anteriores da memória
+            context = await self.memory.get_recent_context()
+            if context:
+                logger.info(f"Carregadas {len(context)} mensagens do contexto anterior")
+                print("\nContexto anterior carregado:")
+                for msg in context[-3:]:  # Mostra as 3 últimas mensagens do contexto
+                    print(f"- {msg}")
+                print()
+            
+        except Exception as e:
+            logger.error(f"Erro ao inicializar chat: {str(e)}")
+            raise ChatError(f"Erro ao inicializar chat: {str(e)}")
+    
     def add_message(self, role: str, content: str) -> str:
         """Adiciona uma mensagem ao histórico e retorna seu ID"""
         message_id = str(uuid.uuid4())
@@ -41,9 +60,10 @@ class ChatAssistant:
         self.messages.append(message)
         return message_id
     
-    def clear_messages(self):
-        """Limpa o histórico de mensagens"""
+    async def clear_messages(self):
+        """Limpa o histórico de mensagens e a memória"""
         self.messages = []
+        await self.memory.clear()
     
     async def get_response(self) -> str:
         """Obtém resposta da IA para o histórico atual"""

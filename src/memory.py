@@ -22,26 +22,40 @@ class ConversationMemory:
         )
         
         # Coleções para diferentes tipos de memória
-        self.short_term = self.client.get_or_create_collection(
-            name="short_term_memory",
-            embedding_function=self.embedding_function
-        )
-        
-        self.long_term = self.client.get_or_create_collection(
-            name="long_term_memory",
-            embedding_function=self.embedding_function
-        )
-        
-        self.permanent = self.client.get_or_create_collection(
-            name="permanent_memory",
-            embedding_function=self.embedding_function
-        )
+        self.short_term = None
+        self.long_term = None
+        self.permanent = None
         
         # Configurações
         self.max_short_term = 10  # Últimas 10 mensagens
         self.max_long_term = 100  # Últimas 100 mensagens relevantes
         
         logger.info("Sistema de memória inicializado com sucesso")
+    
+    async def initialize(self):
+        """Inicializa as coleções de memória"""
+        try:
+            # Cria ou recupera coleções
+            self.short_term = self.client.get_or_create_collection(
+                name="short_term_memory",
+                embedding_function=self.embedding_function
+            )
+            
+            self.long_term = self.client.get_or_create_collection(
+                name="long_term_memory",
+                embedding_function=self.embedding_function
+            )
+            
+            self.permanent = self.client.get_or_create_collection(
+                name="permanent_memory",
+                embedding_function=self.embedding_function
+            )
+            
+            logger.info("Coleções de memória inicializadas com sucesso")
+            
+        except Exception as e:
+            logger.error(f"Erro ao inicializar coleções de memória: {str(e)}")
+            raise
     
     def _format_message(self, message: Dict) -> str:
         """Formata a mensagem para armazenamento"""
@@ -94,6 +108,9 @@ class ConversationMemory:
                     metadatas=[metadata],
                     ids=[message["id"]]
                 )
+            
+            # Persiste as alterações
+            self.client.persist()
             
             logger.info(f"Mensagem {message['id']} adicionada à memória")
             
@@ -154,6 +171,36 @@ class ConversationMemory:
         # Verifica se contém palavras-chave críticas
         return any(keyword in content for keyword in critical_keywords)
     
+    async def get_recent_context(self, max_results: int = 10) -> List[str]:
+        """Recupera as mensagens mais recentes do contexto"""
+        try:
+            results = []
+            
+            # Obtém mensagens da memória de curto prazo
+            short_term_data = self.short_term.get()
+            if short_term_data and short_term_data['documents']:
+                results.extend(short_term_data['documents'])
+            
+            # Obtém mensagens importantes da memória de longo prazo
+            long_term_data = self.long_term.get()
+            if long_term_data and long_term_data['documents']:
+                results.extend(long_term_data['documents'])
+            
+            # Remove duplicatas mantendo a ordem
+            unique_results = []
+            seen = set()
+            for result in results:
+                if result not in seen:
+                    unique_results.append(result)
+                    seen.add(result)
+            
+            # Retorna as últimas max_results mensagens
+            return unique_results[-max_results:]
+            
+        except Exception as e:
+            logger.error(f"Erro ao recuperar contexto recente: {str(e)}")
+            return []
+    
     async def get_relevant_context(self, query: str, max_results: int = 5) -> List[str]:
         """Recupera contexto relevante para uma query"""
         try:
@@ -204,6 +251,10 @@ class ConversationMemory:
             self.short_term.delete(ids=self.short_term.get()['ids'])
             self.long_term.delete(ids=self.long_term.get()['ids'])
             self.permanent.delete(ids=self.permanent.get()['ids'])
+            
+            # Persiste as alterações
+            self.client.persist()
+            
             logger.info("Memória limpa com sucesso")
         except Exception as e:
             logger.error(f"Erro ao limpar memória: {str(e)}")
