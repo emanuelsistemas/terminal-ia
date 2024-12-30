@@ -5,6 +5,12 @@ from groq import Groq
 from openai import OpenAI
 from .logger import setup_logger
 from .memory import ConversationMemory
+from .prompts.system import (
+    get_system_prompt,
+    get_conversation_summary_prompt,
+    process_user_message,
+    get_response_format_prompt
+)
 
 logger = setup_logger(__name__)
 
@@ -39,14 +45,79 @@ class ChatAssistant:
             context = await self.memory.get_recent_context()
             if context:
                 logger.info(f"Carregadas {len(context)} mensagens do contexto anterior")
-                print("\nContexto anterior carregado:")
-                for msg in context[-3:]:  # Mostra as 3 últimas mensagens do contexto
-                    print(f"- {msg}")
-                print()
+                
+                # Gera resumo das conversas anteriores
+                summary = await self._get_conversation_summary(context)
+                if summary:
+                    print("\n" + summary + "\n")
             
         except Exception as e:
             logger.error(f"Erro ao inicializar chat: {str(e)}")
             raise ChatError(f"Erro ao inicializar chat: {str(e)}")
+    
+    async def _get_conversation_summary(self, context: List[str]) -> str:
+        """Gera um resumo das conversas anteriores"""
+        try:
+            # Prepara o prompt para o resumo
+            messages = [
+                {"role": "system", "content": get_conversation_summary_prompt(self.messages)},
+                {"role": "user", "content": "Gere um resumo amigável das conversas anteriores."}
+            ]
+            
+            # Obtém o resumo do modelo
+            if self.provider == "groq":
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=500
+                )
+                return completion.choices[0].message.content
+            
+            elif self.provider == "deepseek":
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=500
+                )
+                return completion.choices[0].message.content
+            
+        except Exception as e:
+            logger.error(f"Erro ao gerar resumo: {str(e)}")
+            return ""
+    
+    async def _process_user_message(self, message: str) -> str:
+        """Processa a mensagem do usuário para melhor compreensão"""
+        try:
+            # Prepara o prompt para processar a mensagem
+            messages = [
+                {"role": "system", "content": process_user_message(message)},
+                {"role": "user", "content": "Reformule esta mensagem para melhor compreensão."}
+            ]
+            
+            # Obtém a mensagem processada do modelo
+            if self.provider == "groq":
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.3,  # Menor temperatura para maior precisão
+                    max_tokens=200
+                )
+                return completion.choices[0].message.content
+            
+            elif self.provider == "deepseek":
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.3,
+                    max_tokens=200
+                )
+                return completion.choices[0].message.content
+            
+        except Exception as e:
+            logger.error(f"Erro ao processar mensagem: {str(e)}")
+            return message  # Retorna mensagem original em caso de erro
     
     def add_message(self, role: str, content: str) -> str:
         """Adiciona uma mensagem ao histórico e retorna seu ID"""
@@ -71,35 +142,36 @@ class ChatAssistant:
             if not self.messages:
                 raise ChatError("Nenhuma mensagem no histórico")
             
-            # Obtém contexto relevante da memória
+            # Processa a última mensagem do usuário
             last_message = self.messages[-1]["content"]
-            context = await self.memory.get_relevant_context(last_message)
+            processed_message = await self._process_user_message(last_message)
             
-            # Prepara o prompt com contexto
-            system_prompt = [
-                "Você é um assistente útil e amigável.",
-                "Contexto relevante da conversa:",
-                *context,
-                "Use este contexto para manter consistência nas respostas.",
-                "Se não houver contexto relevante, responda com base no seu conhecimento geral."
-            ]
+            # Obtém contexto relevante da memória
+            context = await self.memory.get_relevant_context(processed_message)
             
-            # Adiciona mensagem do sistema com contexto
-            messages_with_context = [
-                {"role": "system", "content": "\n".join(system_prompt)}
+            # Prepara as mensagens para o modelo
+            messages = [
+                # Prompt principal do sistema
+                {"role": "system", "content": get_system_prompt(context)},
+                # Formato das respostas
+                {"role": "system", "content": get_response_format_prompt()}
             ]
             
             # Adiciona últimas mensagens do histórico
-            messages_with_context.extend([
+            messages.extend([
                 {"role": msg["role"], "content": msg["content"]}
                 for msg in self.messages[-5:]
             ])
+            
+            # Substitui a última mensagem pela versão processada
+            if len(messages) > 2:  # Garante que há mensagens além dos prompts do sistema
+                messages[-1]["content"] = processed_message
             
             # Obtém resposta do modelo
             if self.provider == "groq":
                 completion = self.client.chat.completions.create(
                     model=self.model,
-                    messages=messages_with_context,
+                    messages=messages,
                     temperature=0.7,
                     max_tokens=4096,
                     top_p=1,
@@ -110,7 +182,7 @@ class ChatAssistant:
             elif self.provider == "deepseek":
                 completion = self.client.chat.completions.create(
                     model=self.model,
-                    messages=messages_with_context,
+                    messages=messages,
                     temperature=0.7,
                     max_tokens=4096,
                     top_p=1,
