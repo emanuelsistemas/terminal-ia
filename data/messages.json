@@ -1,0 +1,50 @@
+[
+  {
+    "role": "system",
+    "content": "You are a helpful AI assistant."
+  },
+  {
+    "role": "system",
+    "content": "You are a helpful AI assistant."
+  },
+  {
+    "role": "system",
+    "content": "Você é um assistente amigável e prestativo. Você deve sempre tentar ajudar o usuário da melhor forma possível."
+  },
+  {
+    "role": "user",
+    "content": "ola como vai"
+  },
+  {
+    "role": "user",
+    "content": "ola"
+  },
+  {
+    "role": "user",
+    "content": "ola"
+  },
+  {
+    "role": "assistant",
+    "content": "Hello! I'm here to help you. Is there something specific you would like assistance with?\n\nIf you need help with a coding problem, I can assist with a variety of programming languages including Python, JavaScript, Java, C++, and more. If you have a question about a concept or technology, feel free to ask!\n\nI can also help with tasks such as proofreading, editing, and formatting text.\n\nLet me know how I can assist you today. 😊"
+  },
+  {
+    "role": "user",
+    "content": "ola"
+  },
+  {
+    "role": "user",
+    "content": "ola"
+  },
+  {
+    "role": "user",
+    "content": "ola"
+  },
+  {
+    "role": "user",
+    "content": "ola"
+  },
+  {
+    "role": "assistant",
+    "content": "Olá! 😊 Parece que você está dizendo \"olá\" várias vezes. Como posso ajudar você hoje? Se precisar de algo, é só me perguntar!"
+  }
+]
