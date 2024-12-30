@@ -96,13 +96,25 @@ class Database:
             logger.error(f"Erro ao salvar mensagens: {str(e)}")
             raise
 
+    def find_message_index(self, messages: List[Dict], message_id: str) -> int:
+        """Encontra o índice da mensagem com o ID especificado"""
+        for i, msg in enumerate(messages):
+            if msg.get("id") == message_id:
+                return i
+        return -1
+
     async def restore_checkpoint(self, message_id: str) -> Optional[List[Dict]]:
         try:
             # Tenta restaurar backup completo do sistema primeiro
             messages = self.system_backup.restore_backup(message_id)
             if messages:
-                logger.info(f"Backup do sistema restaurado: {message_id}")
-                return messages
+                # Encontra o índice da mensagem alvo
+                target_index = self.find_message_index(messages, message_id)
+                if target_index >= 0:
+                    # Mantém apenas as mensagens até o ponto de restauração
+                    messages = messages[:target_index + 1]
+                    logger.info(f"Backup do sistema restaurado até mensagem {message_id}")
+                    return messages
             
             # Se não encontrar backup completo, tenta checkpoint simples
             checkpoint_file = self.checkpoints_dir / f"{message_id}.json"
@@ -112,9 +124,15 @@ class Database:
             
             with open(checkpoint_file, "r", encoding="utf-8") as f:
                 messages = json.load(f)
-            
-            logger.info(f"Checkpoint simples restaurado: {message_id}")
-            return messages
+                # Encontra o índice da mensagem alvo
+                target_index = self.find_message_index(messages, message_id)
+                if target_index >= 0:
+                    # Mantém apenas as mensagens até o ponto de restauração
+                    messages = messages[:target_index + 1]
+                    logger.info(f"Checkpoint simples restaurado até mensagem {message_id}")
+                    return messages
+                
+            return None
         except Exception as e:
             logger.error(f"Erro ao restaurar checkpoint: {str(e)}")
             return None
