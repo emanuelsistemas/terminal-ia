@@ -1,5 +1,5 @@
 from typing import Optional, Dict
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from datetime import datetime
 import asyncio
@@ -27,8 +27,16 @@ class TelegramInterface:
         
         # Descrições dos modelos
         self.model_descriptions = {
-            "groq": "Mixtral 8x7B - mais rápido e versátil",
-            "deepseek": "DeepSeek Chat - mais preciso e detalhado"
+            "groq": {
+                "name": "Mixtral 8x7B",
+                "description": "mais rápido e versátil",
+                "provider": "Groq"
+            },
+            "deepseek": {
+                "name": "DeepSeek Chat",
+                "description": "mais preciso e detalhado",
+                "provider": "DeepSeek"
+            }
         }
         logger.info("TelegramInterface iniciado com sucesso")
     
@@ -71,6 +79,11 @@ class TelegramInterface:
     def _get_system_prompt(self, provider: str) -> Dict:
         return self.prompts["system"].get(provider, self.prompts["system"]["default"])
     
+    def _format_response(self, response: str, provider: str) -> str:
+        model_info = self.model_descriptions[provider]
+        model_header = f"_Via {model_info['provider']} ({model_info['name']})_\n\n"
+        return model_header + response
+    
     def _chat_with_ai(self, message: str, provider: str) -> str:
         try:
             logger.info(f"Processando mensagem com provider {provider}")
@@ -91,16 +104,19 @@ class TelegramInterface:
                 )
             
             logger.info("Resposta gerada com sucesso")
-            return response.choices[0].message.content
+            return self._format_response(response.choices[0].message.content, provider)
         except Exception as e:
             logger.error(f"Erro ao processar mensagem: {str(e)}")
-            return self.prompts["commands"]["error"]["message"].format(error=str(e))
+            return self._format_response(self.prompts["commands"]["error"]["message"].format(error=str(e)), provider)
     
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
         logger.info(f"Comando /start recebido do chat {chat_id}")
         self._init_chat(chat_id)
-        await update.message.reply_text(self.prompts["commands"]["start"]["message"])
+        await update.message.reply_text(
+            self.prompts["commands"]["start"]["message"],
+            parse_mode=ParseMode.MARKDOWN
+        )
     
     async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"Comando /help recebido do chat {update.effective_chat.id}")
@@ -111,9 +127,15 @@ class TelegramInterface:
         logger.info(f"Comando /clear recebido do chat {chat_id}")
         if chat_id in self.chats:
             self.chats[chat_id]["message_count"] = 0
-            await update.message.reply_text(self.prompts["commands"]["clear_success"]["message"])
+            await update.message.reply_text(
+                self.prompts["commands"]["clear_success"]["message"],
+                parse_mode=ParseMode.MARKDOWN
+            )
         else:
-            await update.message.reply_text(self.prompts["commands"]["clear_empty"]["message"])
+            await update.message.reply_text(
+                self.prompts["commands"]["clear_empty"]["message"],
+                parse_mode=ParseMode.MARKDOWN
+            )
     
     async def status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
@@ -129,19 +151,19 @@ class TelegramInterface:
             message_count=chat_info["message_count"],
             uptime=f"{hours}h {minutes}m"
         )
-        await update.message.reply_text(status_msg)
+        await update.message.reply_text(status_msg, parse_mode=ParseMode.MARKDOWN)
     
     def _create_provider_keyboard(self):
         keyboard = [
             [
                 InlineKeyboardButton(
-                    f"🚀 Groq - {self.model_descriptions['groq']}",
+                    f"🚀 {self.model_descriptions['groq']['provider']} - {self.model_descriptions['groq']['name']}",
                     callback_data="provider_groq"
                 )
             ],
             [
                 InlineKeyboardButton(
-                    f"🧠 DeepSeek - {self.model_descriptions['deepseek']}",
+                    f"🧠 {self.model_descriptions['deepseek']['provider']} - {self.model_descriptions['deepseek']['name']}",
                     callback_data="provider_deepseek"
                 )
             ]
@@ -154,7 +176,8 @@ class TelegramInterface:
         keyboard = self._create_provider_keyboard()
         await update.message.reply_text(
             "Selecione o modelo de IA:",
-            reply_markup=keyboard
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
         )
     
     async def provider_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -167,11 +190,13 @@ class TelegramInterface:
         await query.answer()
         self._get_chat_info(chat_id)["provider"] = provider
         
+        model_info = self.model_descriptions[provider]
         await query.edit_message_text(
             self.prompts["commands"]["provider_changed"]["message"].format(
-                provider=provider,
-                description=self.model_descriptions[provider]
-            )
+                provider=model_info["provider"],
+                description=model_info["description"]
+            ),
+            parse_mode=ParseMode.MARKDOWN
         )
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -194,12 +219,15 @@ class TelegramInterface:
             )
             
             chat_info["message_count"] += 1
-            await update.message.reply_text(response)
+            await update.message.reply_text(response, parse_mode=ParseMode.MARKDOWN)
             logger.info(f"Resposta enviada para chat {chat_id}")
         except Exception as e:
             logger.error(f"Erro ao processar mensagem para chat {chat_id}: {str(e)}")
-            error_msg = self.prompts["commands"]["error"]["message"].format(error=str(e))
-            await update.message.reply_text(error_msg)
+            error_msg = self._format_response(
+                self.prompts["commands"]["error"]["message"].format(error=str(e)),
+                provider
+            )
+            await update.message.reply_text(error_msg, parse_mode=ParseMode.MARKDOWN)
     
     def run(self):
         logger.info("Iniciando aplicação do Telegram...")
