@@ -59,70 +59,49 @@ class ChatAssistant:
     def get_response(self) -> str:
         """Obtém resposta do modelo"""
         try:
+            from openai import OpenAI
+            
             if self.provider == "groq":
                 logger.info("Obtendo resposta do Groq...")
-                from groq import Groq
-                
-                # Cria cliente Groq com configuração mínima
-                client = Groq(api_key=self.api_key)
-                
-                # Prepara mensagens para o formato do Groq
-                formatted_messages = [
-                    {"role": msg["role"], "content": msg["content"]}
-                    for msg in self.messages[-10:]  # Últimas 10 mensagens
-                ]
-                
-                # Faz a chamada para a API
-                chat_completion = client.chat.completions.create(
-                    messages=formatted_messages,
-                    model="mixtral-8x7b-32768",
-                    temperature=0.7,
-                    max_tokens=1024,
-                    top_p=1,
-                    stream=False
+                client = OpenAI(
+                    api_key=self.api_key,
+                    base_url="https://api.groq.com/openai/v1"
                 )
-                
-                # Extrai e salva a resposta
-                response = chat_completion.choices[0].message.content
-                self.add_message("assistant", response)
-                logger.info("Resposta do Groq obtida com sucesso")
-                
-                return response
+                model = "mixtral-8x7b-32768"
                 
             elif self.provider == "deepseek":
                 logger.info("Obtendo resposta do Deepseek...")
-                from openai import OpenAI
-                
                 client = OpenAI(
                     api_key=self.api_key,
                     base_url="https://api.deepseek.com/v1"
                 )
+                model = "deepseek-chat"
                 
-                # Prepara mensagens para o formato do OpenAI
-                formatted_messages = [
-                    {"role": msg["role"], "content": msg["content"]}
-                    for msg in self.messages[-10:]  # Últimas 10 mensagens
-                ]
-                
-                # Faz a chamada para a API
-                chat_completion = client.chat.completions.create(
-                    model="deepseek-chat",
-                    messages=formatted_messages,
-                    temperature=0.7,
-                    max_tokens=1024,
-                    top_p=1,
-                    stream=False
-                )
-                
-                # Extrai e salva a resposta
-                response = chat_completion.choices[0].message.content
-                self.add_message("assistant", response)
-                logger.info("Resposta do Deepseek obtida com sucesso")
-                
-                return response
-            
             else:
                 raise ChatError(f"Provedor {self.provider} não suportado")
+            
+            # Prepara mensagens para o formato do OpenAI
+            formatted_messages = [
+                {"role": msg["role"], "content": msg["content"]}
+                for msg in self.messages[-10:]  # Últimas 10 mensagens
+            ]
+            
+            # Faz a chamada para a API
+            chat_completion = client.chat.completions.create(
+                model=model,
+                messages=formatted_messages,
+                temperature=0.7,
+                max_tokens=1024,
+                top_p=1,
+                stream=False
+            )
+            
+            # Extrai e salva a resposta
+            response = chat_completion.choices[0].message.content
+            self.add_message("assistant", response)
+            logger.info(f"Resposta do {self.provider} obtida com sucesso")
+            
+            return response
                 
         except Exception as e:
             logger.error(f"Erro ao obter resposta: {str(e)}")
