@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from .chat import ChatAssistant, ChatError
 from .logger import setup_logger
@@ -39,9 +40,10 @@ def get_api_key(provider: str) -> str:
 def main():
     """Função principal que inicia o chat"""
     try:
-        # Carrega variáveis de ambiente
-        logger.info("Carregando variáveis de ambiente...")
-        load_dotenv()
+        # Carrega variáveis de ambiente do arquivo .env no diretório do projeto
+        env_path = Path(__file__).resolve().parent.parent / ".env"
+        logger.info(f"Carregando variáveis de ambiente de {env_path}...")
+        load_dotenv(env_path)
         
         # Mostra cabeçalho
         print_header()
