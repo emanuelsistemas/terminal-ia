@@ -19,15 +19,12 @@ class ChatAssistant:
         self.messages: List[Dict] = []
         self._load_messages()
         
-        logger.info(f"Chat Assistant inicializado com provedor {provider}")
-    
     def _load_messages(self):
         """Carrega mensagens do arquivo"""
         try:
             if self.messages_file.exists():
                 with open(self.messages_file, "r", encoding="utf-8") as f:
                     self.messages = json.load(f)
-                logger.info(f"Carregadas {len(self.messages)} mensagens do histórico")
         except Exception as e:
             logger.error(f"Erro ao carregar mensagens: {str(e)}")
             self.messages = []
@@ -40,7 +37,6 @@ class ChatAssistant:
             
             with open(self.messages_file, "w", encoding="utf-8") as f:
                 json.dump(self.messages, f, ensure_ascii=False, indent=2)
-            logger.info(f"Salvas {len(self.messages)} mensagens no histórico")
         except Exception as e:
             logger.error(f"Erro ao salvar mensagens: {str(e)}")
     
@@ -54,7 +50,6 @@ class ChatAssistant:
         }
         self.messages.append(message)
         self._save_messages()
-        logger.info(f"Adicionada mensagem de {role} ao histórico")
     
     def get_response(self) -> str:
         """Obtém resposta do modelo"""
@@ -62,7 +57,6 @@ class ChatAssistant:
             from openai import OpenAI
             
             if self.provider == "groq":
-                logger.info("Obtendo resposta do Groq...")
                 client = OpenAI(
                     api_key=self.api_key,
                     base_url="https://api.groq.com/openai/v1"
@@ -70,7 +64,6 @@ class ChatAssistant:
                 model = "mixtral-8x7b-32768"
                 
             elif self.provider == "deepseek":
-                logger.info("Obtendo resposta do Deepseek...")
                 client = OpenAI(
                     api_key=self.api_key,
                     base_url="https://api.deepseek.com/v1"
@@ -99,7 +92,6 @@ class ChatAssistant:
             # Extrai e salva a resposta
             response = chat_completion.choices[0].message.content
             self.add_message("assistant", response)
-            logger.info(f"Resposta do {self.provider} obtida com sucesso")
             
             return response
                 
@@ -113,7 +105,6 @@ class ChatAssistant:
             self.messages = []
             if self.messages_file.exists():
                 self.messages_file.unlink()
-            logger.info("Histórico de mensagens limpo")
         except Exception as e:
             logger.error(f"Erro ao limpar mensagens: {str(e)}")
             raise ChatError(f"Erro ao limpar mensagens: {str(e)}")

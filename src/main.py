@@ -42,7 +42,6 @@ def main():
     try:
         # Carrega variáveis de ambiente do arquivo .env no diretório do projeto
         env_path = Path(__file__).resolve().parent.parent / ".env"
-        logger.info(f"Carregando variáveis de ambiente de {env_path}...")
         load_dotenv(env_path)
         
         # Mostra cabeçalho
@@ -50,7 +49,6 @@ def main():
         
         # Obtém escolha do provedor
         provider = get_provider_choice()
-        logger.info(f"Provedor escolhido: {provider}")
         
         # Obtém chave da API
         api_key = get_api_key(provider)
@@ -58,7 +56,6 @@ def main():
             print(f"\nErro: Chave da API do {provider} não encontrada no arquivo .env")
             return
         
-        logger.info("Inicializando chat...")
         # Inicializa o chat
         chat = ChatAssistant(api_key=api_key, provider=provider)
         
@@ -85,7 +82,7 @@ def main():
                 chat.add_message("user", user_input)
                 
                 # Obtém resposta do assistente
-                print("\nAssistente: ", end="", flush=True)
+                print("\nAssistente: ", end="")
                 response = chat.get_response()
                 print(f"{response}\n")
                 
