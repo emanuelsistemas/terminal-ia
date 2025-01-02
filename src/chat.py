@@ -6,6 +6,7 @@ from .config import DATA_DIR
 from .logger import setup_logger
 from .knowledge import InformationManager
 from .prompts import system as prompts
+from .browser_test import BrowserTest
 
 logger = setup_logger(__name__)
 
@@ -20,6 +21,7 @@ class ChatAssistant:
         self.messages_file = DATA_DIR / "messages.json"
         self.messages: List[Dict] = []
         self.info_manager = InformationManager()
+        self.browser_test = BrowserTest()
         self._load_messages()
     
     def _load_messages(self):
@@ -51,6 +53,15 @@ class ChatAssistant:
         }
         self.messages.append(message)
         self._save_messages()
+    
+    def test_web_interface(self, url: str) -> str:
+        """Testa a interface web e retorna relatório"""
+        try:
+            result = self.browser_test.test_page(url, "web_interface")
+            return self.browser_test.get_test_report()
+        except Exception as e:
+            logger.error(f"Erro ao testar interface web: {str(e)}")
+            raise ChatError(f"Erro ao testar interface web: {str(e)}")
     
     async def get_response(self) -> str:
         """Obtém resposta do modelo com suporte a pesquisa"""
