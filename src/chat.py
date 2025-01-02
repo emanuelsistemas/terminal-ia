@@ -18,7 +18,7 @@ class ChatAssistant:
         self.messages_file = DATA_DIR / "messages.json"
         self.messages: List[Dict] = []
         self._load_messages()
-        
+    
     def _load_messages(self):
         """Carrega mensagens do arquivo"""
         try:
@@ -32,9 +32,7 @@ class ChatAssistant:
     def _save_messages(self):
         """Salva mensagens no arquivo"""
         try:
-            # Garante que o diretório existe
             DATA_DIR.mkdir(parents=True, exist_ok=True)
-            
             with open(self.messages_file, "w", encoding="utf-8") as f:
                 json.dump(self.messages, f, ensure_ascii=False, indent=2)
         except Exception as e:
@@ -73,13 +71,11 @@ class ChatAssistant:
             else:
                 raise ChatError(f"Provedor {self.provider} não suportado")
             
-            # Prepara mensagens para o formato do OpenAI
             formatted_messages = [
                 {"role": msg["role"], "content": msg["content"]}
-                for msg in self.messages[-10:]  # Últimas 10 mensagens
+                for msg in self.messages[-10:]
             ]
             
-            # Faz a chamada para a API
             chat_completion = client.chat.completions.create(
                 model=model,
                 messages=formatted_messages,
@@ -89,7 +85,6 @@ class ChatAssistant:
                 stream=False
             )
             
-            # Extrai e salva a resposta
             response = chat_completion.choices[0].message.content
             self.add_message("assistant", response)
             
