@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 from .chat import ChatAssistant, ChatError
@@ -6,27 +7,31 @@ from .logger import setup_logger
 
 logger = setup_logger(__name__)
 
+def print_flush(msg, end="\n"):
+    print(msg, end=end, flush=True)
+    sys.stdout.flush()
+
 def print_header():
-    print("╔══════════════════════════════════════╗")
-    print("║ Bem-vindo ao Chat IA                 ║")
-    print("╚══════════════════════════════════════╝\n")
+    print_flush("╔══════════════════════════════════════╗")
+    print_flush("║ Bem-vindo ao Chat IA                 ║")
+    print_flush("╚══════════════════════════════════════╝\n")
 
 def get_provider_choice() -> str:
-    print("Escolha o provedor:\n")
-    print("1. Groq")
-    print("2. Deepseek\n")
+    print_flush("Escolha o provedor:\n")
+    print_flush("1. Groq")
+    print_flush("2. Deepseek\n")
     
     while True:
         try:
-            choice = input("Opção (1-2): ")
+            choice = input("Opção (1-2): ").strip()
             if choice == "1":
                 return "groq"
             elif choice == "2":
                 return "deepseek"
             else:
-                print("\nOpção inválida. Por favor, escolha 1 ou 2.")
+                print_flush("\nOpção inválida. Por favor, escolha 1 ou 2.")
         except Exception as e:
-            print(f"\nErro ao ler opção: {str(e)}")
+            print_flush(f"\nErro ao ler opção: {str(e)}")
 
 def get_api_key(provider: str) -> str:
     """Obtém a chave da API do provedor escolhido"""
@@ -53,13 +58,13 @@ def main():
         # Obtém chave da API
         api_key = get_api_key(provider)
         if not api_key:
-            print(f"\nErro: Chave da API do {provider} não encontrada no arquivo .env")
+            print_flush(f"\nErro: Chave da API do {provider} não encontrada no arquivo .env")
             return
         
         # Inicializa o chat
         chat = ChatAssistant(api_key=api_key, provider=provider)
         
-        print("\nChat iniciado! Digite 'sair' para encerrar ou 'limpar' para limpar o histórico.\n")
+        print_flush("\nChat iniciado! Digite 'sair' para encerrar ou 'limpar' para limpar o histórico.\n")
         
         # Loop principal
         while True:
@@ -69,11 +74,11 @@ def main():
                 
                 # Verifica comandos especiais
                 if user_input.lower() == "sair":
-                    print("\nAté logo!")
+                    print_flush("\nAté logo!")
                     break
                 elif user_input.lower() == "limpar":
                     chat.clear_messages()
-                    print("\nHistórico limpo!\n")
+                    print_flush("\nHistórico limpo!\n")
                     continue
                 elif not user_input:
                     continue
@@ -82,21 +87,21 @@ def main():
                 chat.add_message("user", user_input)
                 
                 # Obtém resposta do assistente
-                print("\nAssistente: ", end="")
+                print_flush("\nAssistente: ", end="")
                 response = chat.get_response()
-                print(f"{response}\n")
+                print_flush(f"{response}\n")
                 
             except ChatError as e:
-                print(f"\nErro no chat: {str(e)}\n")
+                print_flush(f"\nErro no chat: {str(e)}\n")
             except KeyboardInterrupt:
-                print("\n\nChat encerrado pelo usuário.")
+                print_flush("\n\nChat encerrado pelo usuário.")
                 break
             except Exception as e:
-                print(f"\nErro inesperado: {str(e)}\n")
+                print_flush(f"\nErro inesperado: {str(e)}\n")
                 logger.error(f"Erro inesperado: {str(e)}")
         
     except Exception as e:
-        print(f"\nErro fatal: {str(e)}")
+        print_flush(f"\nErro fatal: {str(e)}")
         logger.error(f"Erro fatal: {str(e)}")
 
 if __name__ == "__main__":
