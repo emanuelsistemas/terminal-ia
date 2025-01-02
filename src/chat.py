@@ -4,6 +4,8 @@ import uuid
 import json
 from .config import DATA_DIR
 from .logger import setup_logger
+from .knowledge import InformationManager
+from .prompts import system as prompts
 
 logger = setup_logger(__name__)
 
@@ -17,6 +19,7 @@ class ChatAssistant:
         self.provider = provider
         self.messages_file = DATA_DIR / "messages.json"
         self.messages: List[Dict] = []
+        self.info_manager = InformationManager()
         self._load_messages()
     
     def _load_messages(self):
@@ -49,11 +52,21 @@ class ChatAssistant:
         self.messages.append(message)
         self._save_messages()
     
-    def get_response(self) -> str:
-        """Obtém resposta do modelo"""
+    async def get_response(self) -> str:
+        """Obtém resposta do modelo com suporte a pesquisa"""
         try:
             from openai import OpenAI
             
+            # Obtém a última mensagem do usuário
+            user_message = self.messages[-1]["content"]
+            
+            # Analisa a mensagem e busca informações relevantes
+            info = await self.info_manager.get_information(user_message)
+            
+            # Prepara o contexto com as informações obtidas
+            research_prompt = prompts.get_research_prompt(user_message, info)
+            
+            # Configura o cliente OpenAI baseado no provedor
             if self.provider == "groq":
                 client = OpenAI(
                     api_key=self.api_key,
@@ -71,11 +84,20 @@ class ChatAssistant:
             else:
                 raise ChatError(f"Provedor {self.provider} não suportado")
             
+            # Prepara as mensagens para o modelo
+            system_prompt = prompts.get_system_prompt()
             formatted_messages = [
-                {"role": msg["role"], "content": msg["content"]}
-                for msg in self.messages[-10:]
+                {"role": "system", "content": system_prompt},
+                {"role": "system", "content": research_prompt}
             ]
             
+            # Adiciona histórico recente
+            formatted_messages.extend([
+                {"role": msg["role"], "content": msg["content"]}
+                for msg in self.messages[-5:]
+            ])
+            
+            # Obtém resposta do modelo
             chat_completion = client.chat.completions.create(
                 model=model,
                 messages=formatted_messages,

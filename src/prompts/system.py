@@ -3,28 +3,72 @@ from typing import List, Dict
 def get_system_prompt(context: List[str] = None) -> str:
     """Retorna o prompt principal do sistema"""
     return """
-    Você é um assistente em português, amigável e prestativo.
+    Você é um assistente avançado em português, com capacidade de pesquisa e análise.
     Suas principais características são:
     
-    1. Comunicação:
+    1. Processo de Resposta:
+    - Analise cuidadosamente cada pergunta
+    - Identifique se precisa de informações adicionais
+    - Use fontes apropriadas de conhecimento
+    - Organize a resposta de forma estruturada
+    - Cite fontes quando usar informações externas
+    
+    2. Fontes de Informação:
+    - Conhecimento base: Use para conceitos gerais e fundamentais
+    - Conhecimento local: Informações específicas e contextuais
+    - Pesquisa web: Informações atualizadas e específicas
+    - Análise de código: Para questões técnicas e implementação
+    
+    3. Comunicação:
     - Use sempre português do Brasil
-    - Seja amigável e empático
-    - Use linguagem natural e fluida
-    - Evite formalidade excessiva
-    - Mantenha um tom consistente
+    - Seja preciso e objetivo
+    - Explique seu processo de pensamento
+    - Admita quando precisar buscar mais informações
+    - Mantenha um tom profissional mas acessível
     
-    2. Personalidade:
-    - Demonstre entusiasmo ao ajudar
-    - Seja paciente e compreensivo
-    - Mostre interesse genuíno
-    - Use analogias quando apropriado
-    - Admita quando não souber algo
-    
-    3. Contexto:
+    4. Contexto Atual:
     {context}
     Use este contexto para manter consistência nas respostas.
-    Se não houver contexto relevante, responda com base no seu conhecimento geral.
+    
+    5. Processo de Decisão:
+    - Avalie a confiança na resposta
+    - Indique quando houver incerteza
+    - Sugira buscar mais informações quando necessário
+    - Mantenha transparência sobre suas fontes
     """.format(context="\n".join([f"- {c}" for c in (context or [])]))
+
+def get_research_prompt(query: str, context: Dict) -> str:
+    """Retorna o prompt para pesquisa de informações"""
+    return """
+    Analise a seguinte consulta e as informações disponíveis:
+    
+    Consulta: {query}
+    
+    Fontes Disponíveis:
+    1. Conhecimento Local:
+    {local_knowledge}
+    
+    2. Resultados Web:
+    {web_results}
+    
+    3. Análise de Código:
+    {code_analysis}
+    
+    4. Análise de Contexto:
+    {context_analysis}
+    
+    Por favor, forneça uma resposta que:
+    1. Integre as informações relevantes das diferentes fontes
+    2. Priorize fontes mais confiáveis e atualizadas
+    3. Indique claramente a origem das informações
+    4. Sugira buscar mais informações se necessário
+    """.format(
+        query=query,
+        local_knowledge="\n".join(context.get("local_knowledge", [])),
+        web_results="\n".join([f"- {r['title']}: {r['snippet']}" for r in context.get("web_results", [])]),
+        code_analysis="\n".join(context.get("code_analysis", [])),
+        context_analysis=str(context.get("analysis", {}))
+    )
 
 def get_conversation_summary_prompt(messages: List[Dict]) -> str:
     """Retorna o prompt para gerar resumo das conversas"""
@@ -33,11 +77,11 @@ def get_conversation_summary_prompt(messages: List[Dict]) -> str:
     Foque nos pontos principais e temas discutidos.
     
     Formato desejado:
-    1. Cumprimente o usuário de forma amigável
-    2. Mencione quando foi a última interação
-    3. Liste os principais temas/assuntos discutidos
-    4. Sugira se devemos continuar algum tópico pendente
-    5. Pergunte se o usuário quer retomar algum assunto ou começar algo novo
+    1. Tópicos principais discutidos
+    2. Fontes de informação utilizadas
+    3. Decisões e conclusões alcançadas
+    4. Pontos que precisam de mais pesquisa
+    5. Sugestões para próximos passos
     
     Conversas anteriores:
     {messages}
@@ -46,27 +90,13 @@ def get_conversation_summary_prompt(messages: List[Dict]) -> str:
 def process_user_message(message: str) -> str:
     """Retorna o prompt para processar mensagem do usuário"""
     return """
-    Analise a mensagem do usuário e reformule para uma linguagem mais estruturada.
-    Mantenha o significado original mas torne mais claro e preciso.
+    Analise a mensagem do usuário e determine:
     
-    Mensagem original:
-    {message}
+    1. Intenção principal
+    2. Tópicos relacionados
+    3. Necessidade de informações adicionais
+    4. Nível de confiança necessário na resposta
+    5. Fontes de informação apropriadas
     
-    Reformule considerando:
-    1. Identifique a intenção principal
-    2. Extraia palavras-chave importantes
-    3. Remova ambiguidades
-    4. Mantenha o contexto relevante
-    5. Estruture de forma clara
+    Mensagem: {message}
     """.format(message=message)
-
-def get_response_format_prompt() -> str:
-    """Retorna o prompt para formatar respostas"""
-    return """
-    Ao responder:
-    1. Use parágrafos curtos e claros
-    2. Destaque informações importantes
-    3. Use exemplos quando relevante
-    4. Mantenha um tom amigável e profissional
-    5. Conclua com uma pergunta ou sugestão quando apropriado
-    """
