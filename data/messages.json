@@ -16,5 +16,41 @@
     "role": "assistant",
     "content": "¡Hola! Estoy aquí para ayudarte. ¿Cómo estás tú? ¿En qué puedo asistirte hoy? 😊",
     "timestamp": "2024-12-30T17:55:59.761394"
+  },
+  {
+    "id": "46cf0d77-318d-4c29-b0f1-d9c8e7a75bbc",
+    "role": "user",
+    "content": "ola",
+    "timestamp": "2025-01-02T16:56:55.051912"
+  },
+  {
+    "id": "7f8752d1-0a61-4492-ba29-d66beef08fd0",
+    "role": "user",
+    "content": "groq",
+    "timestamp": "2025-01-02T16:57:19.907186"
+  },
+  {
+    "id": "7f78bcc5-ef82-48d1-a47e-2db9f4508a00",
+    "role": "user",
+    "content": "ola",
+    "timestamp": "2025-01-02T17:28:04.030866"
+  },
+  {
+    "id": "ef9c00bd-1420-4cd2-8b85-9da0951bd9bd",
+    "role": "user",
+    "content": "ola",
+    "timestamp": "2025-01-02T17:28:05.618211"
+  },
+  {
+    "id": "817b361e-850a-42eb-a8af-579f9e4605cf",
+    "role": "user",
+    "content": "groq",
+    "timestamp": "2025-01-02T17:28:25.419542"
+  },
+  {
+    "id": "9723a952-aa66-4c19-ab55-8be07c0829a8",
+    "role": "user",
+    "content": "deepseek",
+    "timestamp": "2025-01-02T17:28:42.328280"
   }
 ]

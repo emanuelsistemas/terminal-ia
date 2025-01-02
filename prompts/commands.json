@@ -1,0 +1,29 @@
+{
+    "start": {
+        "message": "Olá! Eu sou um assistente virtual pronto para ajudar. Use /help para ver os comandos disponíveis."
+    },
+    "help": {
+        "message": "Comandos disponíveis:\n\n/start - Inicia a conversa\n/help - Mostra esta ajuda\n/clear - Limpa o histórico\n/status - Mostra informações do chat\n/provider [nome] - Muda o modelo de IA (groq ou deepseek)"
+    },
+    "clear_success": {
+        "message": "Histórico limpo com sucesso!"
+    },
+    "clear_empty": {
+        "message": "Não há histórico para limpar."
+    },
+    "status": {
+        "message": "Status do Chat:\n\nProvedor: {provider}\nMensagens: {message_count}\nTempo ativo: {uptime}"
+    },
+    "provider_help": {
+        "message": "Use /provider [nome] para mudar o modelo.\nModelos disponíveis:\n- groq (Mixtral 8x7B - mais rápido e versátil)\n- deepseek (DeepSeek Chat - mais preciso e detalhado)"
+    },
+    "provider_invalid": {
+        "message": "Modelo inválido. Use /provider para ver os modelos disponíveis."
+    },
+    "provider_changed": {
+        "message": "Modelo alterado para {provider} ({description})"
+    },
+    "error": {
+        "message": "Desculpe, ocorreu um erro: {error}"
+    }
+}
