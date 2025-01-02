@@ -1,108 +1,81 @@
 import os
 import sys
+import asyncio
+from typing import Optional
 from pathlib import Path
 from dotenv import load_dotenv
-from .chat import ChatAssistant, ChatError
+from .chat import ChatAssistant
+from .telegram_bot import TelegramInterface
+from .terminal import TerminalInterface
 from .logger import setup_logger
 
 logger = setup_logger(__name__)
 
-def print_flush(msg, end="\n"):
-    print(msg, end=end, flush=True)
-    sys.stdout.flush()
-
-def print_header():
-    print_flush("╔══════════════════════════════════════╗")
-    print_flush("║ Bem-vindo ao Chat IA                 ║")
-    print_flush("╚══════════════════════════════════════╝\n")
-
-def get_provider_choice() -> str:
-    print_flush("Escolha o provedor:\n")
-    print_flush("1. Groq")
-    print_flush("2. Deepseek\n")
+def load_config() -> dict:
+    """Carrega configurações do ambiente"""
+    load_dotenv()
     
-    while True:
-        try:
-            choice = input("Opção (1-2): ").strip()
-            if choice == "1":
-                return "groq"
-            elif choice == "2":
-                return "deepseek"
-            else:
-                print_flush("\nOpção inválida. Por favor, escolha 1 ou 2.")
-        except Exception as e:
-            print_flush(f"\nErro ao ler opção: {str(e)}")
-
-def get_api_key(provider: str) -> str:
-    """Obtém a chave da API do provedor escolhido"""
-    if provider == "groq":
-        return os.getenv("GROQ_API_KEY", "")
-    elif provider == "deepseek":
-        return os.getenv("DEEPSEEK_API_KEY", "")
-    else:
-        raise ValueError(f"Provedor {provider} não suportado")
+    required_vars = [
+        "GROQ_API_KEY",
+        "DEEPSEEK_API_KEY",
+    ]
+    
+    config = {}
+    missing_vars = []
+    
+    for var in required_vars:
+        value = os.getenv(var)
+        if not value:
+            missing_vars.append(var)
+        config[var] = value
+    
+    # Telegram token é opcional
+    config["TELEGRAM_BOT_TOKEN"] = os.getenv("TELEGRAM_BOT_TOKEN")
+    
+    if missing_vars:
+        logger.error(f"Variáveis de ambiente faltando: {', '.join(missing_vars)}")
+        sys.exit(1)
+    
+    return config
 
 def main():
-    """Função principal que inicia o chat"""
+    """Função principal do programa"""
     try:
-        # Carrega variáveis de ambiente do arquivo .env no diretório do projeto
-        env_path = Path(__file__).resolve().parent.parent / ".env"
-        load_dotenv(env_path)
+        # Carrega configurações
+        config = load_config()
         
-        # Mostra cabeçalho
-        print_header()
+        # Verifica modo de operação
+        mode = sys.argv[1] if len(sys.argv) > 1 else "terminal"
         
-        # Obtém escolha do provedor
-        provider = get_provider_choice()
-        
-        # Obtém chave da API
-        api_key = get_api_key(provider)
-        if not api_key:
-            print_flush(f"\nErro: Chave da API do {provider} não encontrada no arquivo .env")
-            return
-        
-        # Inicializa o chat
-        chat = ChatAssistant(api_key=api_key, provider=provider)
-        
-        print_flush("\nChat iniciado! Digite 'sair' para encerrar ou 'limpar' para limpar o histórico.\n")
-        
-        # Loop principal
-        while True:
-            try:
-                # Obtém entrada do usuário
-                user_input = input("Você: ").strip()
-                
-                # Verifica comandos especiais
-                if user_input.lower() == "sair":
-                    print_flush("\nAté logo!")
-                    break
-                elif user_input.lower() == "limpar":
-                    chat.clear_messages()
-                    print_flush("\nHistórico limpo!\n")
-                    continue
-                elif not user_input:
-                    continue
-                
-                # Adiciona mensagem do usuário
-                chat.add_message("user", user_input)
-                
-                # Obtém resposta do assistente
-                print_flush("\nAssistente: ", end="")
-                response = chat.get_response()
-                print_flush(f"{response}\n")
-                
-            except ChatError as e:
-                print_flush(f"\nErro no chat: {str(e)}\n")
-            except KeyboardInterrupt:
-                print_flush("\n\nChat encerrado pelo usuário.")
-                break
-            except Exception as e:
-                print_flush(f"\nErro inesperado: {str(e)}\n")
-                logger.error(f"Erro inesperado: {str(e)}")
-        
+        if mode == "telegram":
+            # Verifica token do Telegram
+            if not config["TELEGRAM_BOT_TOKEN"]:
+                logger.error("Token do Telegram não configurado")
+                sys.exit(1)
+            
+            # Inicia interface do Telegram
+            telegram = TelegramInterface(
+                token=config["TELEGRAM_BOT_TOKEN"],
+                groq_api_key=config["GROQ_API_KEY"],
+                deepseek_api_key=config["DEEPSEEK_API_KEY"]
+            )
+            telegram.run()
+            
+        else:
+            # Inicia interface do terminal
+            terminal = TerminalInterface(
+                groq_api_key=config["GROQ_API_KEY"],
+                deepseek_api_key=config["DEEPSEEK_API_KEY"]
+            )
+            terminal.run()
+    
+    except KeyboardInterrupt:
+        logger.info("Programa encerrado pelo usuário")
+        sys.exit(0)
+    
     except Exception as e:
-        print_flush(f"\nErro fatal: {str(e)}")
         logger.error(f"Erro fatal: {str(e)}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
