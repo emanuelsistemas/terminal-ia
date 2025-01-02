@@ -62,6 +62,8 @@ class ChatAssistant:
             if self.provider == "groq":
                 logger.info("Obtendo resposta do Groq...")
                 from groq import Groq
+                
+                # Cria cliente Groq com configuração mínima
                 client = Groq(api_key=self.api_key)
                 
                 # Prepara mensagens para o formato do Groq
