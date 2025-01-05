@@ -1,29 +1,20 @@
 {
     "start": {
-        "message": "Olá! Eu sou um assistente virtual pronto para ajudar. Use /help para ver os comandos disponíveis."
-    },
-    "help": {
-        "message": "Comandos disponíveis:\n\n/start - Inicia a conversa\n/help - Mostra esta ajuda\n/clear - Limpa o histórico\n/status - Mostra informações do chat\n/provider [nome] - Muda o modelo de IA (groq ou deepseek)"
+        "message": "👋 Olá! Que bom ter você por aqui!\n\nEu sou o NexusIA, seu assistente virtual. Estou aqui para ajudar você com:\n\n🤖 Conversas interativas e naturais\n📝 Criação de arquivos\n💡 Respostas para suas dúvidas\n\nVocê pode mudar o modelo de IA que eu uso com o comando /provider\n\nComo posso ajudar você hoje? 😊"
     },
     "clear_success": {
-        "message": "Histórico limpo com sucesso!"
+        "message": "✨ Pronto! Começamos uma nova conversa. Como posso ajudar?"
     },
     "clear_empty": {
-        "message": "Não há histórico para limpar."
+        "message": "🤔 Hmm, parece que ainda não tínhamos começado uma conversa. Mas agora estamos prontos para começar! Como posso ajudar?"
     },
     "status": {
-        "message": "Status do Chat:\n\nProvedor: {provider}\nMensagens: {message_count}\nTempo ativo: {uptime}"
-    },
-    "provider_help": {
-        "message": "Use /provider [nome] para mudar o modelo.\nModelos disponíveis:\n- groq (Mixtral 8x7B - mais rápido e versátil)\n- deepseek (DeepSeek Chat - mais preciso e detalhado)"
-    },
-    "provider_invalid": {
-        "message": "Modelo inválido. Use /provider para ver os modelos disponíveis."
+        "message": "📊 *Status da nossa conversa*\n\n🤖 Modelo: *{provider}*\n💬 Mensagens trocadas: *{message_count}*\n⏱️ Tempo de conversa: *{uptime}*\n\nEstou aqui para continuar ajudando! 😊"
     },
     "provider_changed": {
-        "message": "Modelo alterado para {provider} ({description})"
+        "message": "✅ Perfeito! Agora estou usando o modelo *{provider}* ({description}).\n\nComo posso ajudar você? 😊"
     },
     "error": {
-        "message": "Desculpe, ocorreu um erro: {error}"
+        "message": "😅 Ops! Tive um pequeno problema aqui:\n\n{error}\n\nQue tal tentar novamente? Estou pronto para ajudar! 💪"
     }
 }

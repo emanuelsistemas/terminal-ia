@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from groq import Groq
 from openai import OpenAI
 import json
+import re
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,8 @@ class TelegramInterface:
         self.chats: Dict[int, Dict] = {}
         self.default_provider = "groq"
         self.executor = ThreadPoolExecutor(max_workers=4)
+        self.workspace_dir = Path("/root/projetos/chat-ia-terminal/workspace")
+        self.workspace_dir.mkdir(exist_ok=True)
         
         # Carrega os prompts
         self.prompts = self._load_prompts()
@@ -84,10 +87,44 @@ class TelegramInterface:
         model_info = self.model_descriptions[provider]
         model_header = f"_Via {model_info['provider']} ({model_info['name']})_\n\n"
         return model_header + response
+
+    def _create_file(self, filename: str, content: str) -> str:
+        """Cria um arquivo no workspace e retorna o caminho"""
+        if not filename:
+            return "Nome do arquivo não especificado"
+
+        try:
+            # Se não houver extensão, adiciona .txt
+            if '.' not in filename:
+                filename = f"{filename}.txt"
+
+            # Sanitiza o nome do arquivo
+            filename = re.sub(r'[^a-zA-Z0-9._-]', '', filename)
+            
+            # Define o caminho completo
+            filepath = self.workspace_dir / filename
+            
+            # Cria o arquivo
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            return f"✅ Arquivo criado com sucesso!\nLocal: `{filepath}`\nConteúdo: `{content}`"
+        except Exception as e:
+            return f"❌ Erro ao criar arquivo: {str(e)}"
     
     def _chat_with_ai(self, message: str, provider: str) -> str:
         try:
             logger.info(f"Processando mensagem com provider {provider}")
+            
+            # Verifica se é um comando para criar arquivo
+            create_file_match = re.match(r"crie\s+(?:um\s+)?(?:arquivo\s+)?(?:chamado\s+)?([\w.-]+)(?:\s+com\s+(?:a\s+)?mensagem(?:,\s+|\s+e\s+|\s+)(.+))", message.lower())
+            if create_file_match:
+                filename = create_file_match.group(1)
+                content = create_file_match.group(2).strip()
+                logger.info(f"Criando arquivo {filename} com conteúdo {content}")
+                return self._create_file(filename, content)
+            
+            # Se não for comando de criar arquivo, processa normalmente com a IA
             system_prompt = self._get_system_prompt(provider)
             messages = [system_prompt, {"role": "user", "content": message}]
             
@@ -105,10 +142,10 @@ class TelegramInterface:
                 )
             
             logger.info("Resposta gerada com sucesso")
-            return self._format_response(response.choices[0].message.content, provider)
+            return response.choices[0].message.content
         except Exception as e:
             logger.error(f"Erro ao processar mensagem: {str(e)}")
-            return self._format_response(self.prompts["commands"]["error"]["message"].format(error=str(e)), provider)
+            return self.prompts["commands"]["error"]["message"].format(error=str(e))
     
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
@@ -209,8 +246,12 @@ class TelegramInterface:
         logger.info(f"Mensagem recebida do chat {chat_id} usando provider {provider}")
         
         try:
-            await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+            # Mostra "digitando" por mais tempo
+            typing_task = asyncio.create_task(
+                self._show_typing(context.bot, chat_id)
+            )
             
+            # Processa a mensagem
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 self.executor,
@@ -219,8 +260,12 @@ class TelegramInterface:
                 provider
             )
             
+            # Cancela o "digitando"
+            typing_task.cancel()
+            
             chat_info["message_count"] += 1
-            await update.message.reply_text(response, parse_mode=ParseMode.MARKDOWN)
+            formatted_response = self._format_response(response, provider)
+            await update.message.reply_text(formatted_response, parse_mode=ParseMode.MARKDOWN)
             logger.info(f"Resposta enviada para chat {chat_id}")
         except Exception as e:
             logger.error(f"Erro ao processar mensagem para chat {chat_id}: {str(e)}")
@@ -229,6 +274,15 @@ class TelegramInterface:
                 provider
             )
             await update.message.reply_text(error_msg, parse_mode=ParseMode.MARKDOWN)
+
+    async def _show_typing(self, bot, chat_id):
+        """Mostra o estado de digitação continuamente"""
+        try:
+            while True:
+                await bot.send_chat_action(chat_id=chat_id, action="typing")
+                await asyncio.sleep(5)  # Renova a cada 5 segundos
+        except asyncio.CancelledError:
+            pass
     
     def run(self):
         logger.info("Iniciando aplicação do Telegram...")
