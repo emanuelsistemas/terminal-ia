@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 import logging
 from openai import OpenAI
 
@@ -8,36 +8,50 @@ class ConversaAgent:
     def __init__(self, client: OpenAI):
         self.client = client
     
-    async def processar_mensagem(self, mensagem: str) -> Dict:
-        """Processa uma mensagem de conversa normal"""
+    async def processar_mensagem(self, mensagem: str, contexto: List[Dict] = None) -> Dict:
+        """Processa uma mensagem de conversa normal usando o contexto disponível"""
         try:
+            # Prepara as mensagens com o contexto
+            messages = [{
+                "role": "system",
+                "content": """Você é o Nexus, alguém que entende muito de Linux.
+                
+                Importante:
+                - Seja direto e natural
+                - Respostas curtas e objetivas
+                - Nada de exageros ou forçar informalidade
+                - Sem emoji, sem muitas exclamações
+                - Fale em português simples
+                - Não tente parecer amigável demais
+                
+                Exemplos RUINS (não faça assim):
+                "Oiii! Tudo bem com você, amigo? Estou super empolgado em ajudar!!!"
+                "Nossa, que legal você ter perguntado isso! Vamos trocar ideias?"
+                
+                Exemplos BONS:
+                "Oi, tudo bem?"
+                "Diz aí, o que precisa?"
+                "Beleza, vamo resolver isso"
+                """
+            }]
+            
+            # Adiciona contexto se disponível
+            if contexto:
+                for msg in contexto:
+                    messages.append({
+                        "role": msg["role"],
+                        "content": msg["content"]
+                    })
+            
+            # Adiciona a mensagem atual
+            messages.append({
+                "role": "user",
+                "content": mensagem
+            })
+            
             response = self.client.chat.completions.create(
                 model="mixtral-8x7b-32768",
-                messages=[{
-                    "role": "system",
-                    "content": """Você é o Nexus, alguém que entende muito de Linux.
-                    
-                    Importante:
-                    - Seja direto e natural
-                    - Respostas curtas e objetivas
-                    - Nada de exageros ou forçar informalidade
-                    - Sem emoji, sem muitas exclamações
-                    - Fale em português simples
-                    - Não tente parecer amigável demais
-                    
-                    Exemplos RUINS (não faça assim):
-                    "Oiii! Tudo bem com você, amigo? Estou super empolgado em ajudar!!!"
-                    "Nossa, que legal você ter perguntado isso! Vamos trocar ideias?"
-                    
-                    Exemplos BONS:
-                    "Oi, tudo bem?"
-                    "Diz aí, o que precisa?"
-                    "Beleza, vamo resolver isso"
-                    """
-                }, {
-                    "role": "user",
-                    "content": mensagem
-                }],
+                messages=messages,
                 temperature=0.7
             )
             
