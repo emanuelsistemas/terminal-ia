@@ -1,18 +1,18 @@
 {
     "start": {
-        "message": "👋 Olá! Que bom ter você por aqui!\n\nEu sou o NexusIA, seu assistente virtual. Estou aqui para ajudar você com:\n\n🤖 Conversas interativas e naturais\n📝 Criação de arquivos\n💡 Respostas para suas dúvidas\n\nVocê pode mudar o modelo de IA que eu uso com o comando /provider\n\nComo posso ajudar você hoje? 😊"
+        "message": "👋 Olá! Sou um assistente técnico especializado em Linux e desenvolvimento.\n\nPosso ajudar você com:\n• Criação e gerenciamento de arquivos e diretórios\n• Execução de comandos Linux\n• Desenvolvimento e debugging\n\nComandos disponíveis:\n/start - Mostra esta mensagem\n/help - Mostra esta mensagem\n/clear - Limpa o histórico da conversa\n/status - Mostra estatísticas do bot\n/provider - Altera o modelo de IA"
     },
     "clear_success": {
-        "message": "✨ Pronto! Começamos uma nova conversa. Como posso ajudar?"
+        "message": "🧹 Histórico limpo com sucesso!"
     },
     "clear_empty": {
-        "message": "🤔 Hmm, parece que ainda não tínhamos começado uma conversa. Mas agora estamos prontos para começar! Como posso ajudar?"
+        "message": "ℹ️ Não há histórico para limpar."
     },
     "status": {
-        "message": "📊 *Status da nossa conversa*\n\n🤖 Modelo: *{provider}*\n💬 Mensagens trocadas: *{message_count}*\n⏱️ Tempo de conversa: *{uptime}*\n\nEstou aqui para continuar ajudando! 😊"
+        "message": "📊 *Status do Bot*\n\n• Modelo: {provider}\n• Mensagens processadas: {message_count}\n• Tempo ativo: {uptime}"
     },
     "provider_changed": {
-        "message": "✅ Perfeito! Agora estou usando o modelo *{provider}* ({description}).\n\nComo posso ajudar você? 😊"
+        "message": "✅ Modelo alterado para {provider} ({description})"
     },
     "error": {
         "message": "😅 Ops! Tive um pequeno problema aqui:\n\n{error}\n\nQue tal tentar novamente? Estou pronto para ajudar! 💪"
