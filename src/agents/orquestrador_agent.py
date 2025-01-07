@@ -6,6 +6,7 @@ from .conversa_agent import ConversaAgent
 from .comando_agent import ComandoAgent
 from .diretorio_agent import DiretorioAgent
 from .file_agent import FileAgent
+from .estados.estado_projeto import EstadoProjeto
 from ..memory import Memory
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,9 @@ class OrquestradorAgent:
         # Inicializa o sistema de memória
         self.memory = Memory()
         
+        # Inicializa o estado do projeto
+        self.estado = EstadoProjeto()
+        
         logger.info("OrquestradorAgent inicializado com sucesso")
     
     async def processar_mensagem(self, mensagem: str, chat_id: int) -> Dict:
@@ -45,6 +49,13 @@ class OrquestradorAgent:
                 
                 # Busca contexto relevante
                 contexto = self.memory.get_context(chat_id, mensagem)
+                
+                # Adiciona resumo do estado ao contexto
+                if self.estado.tem_projeto_ativo():
+                    contexto.append({
+                        "role": "system",
+                        "content": f"\nContexto atual:\n{self.estado.get_resumo()}"
+                    })
                 
                 # Processa a mensagem com o contexto
                 resultado = await self.conversa.processar_mensagem(mensagem, contexto)
@@ -70,6 +81,12 @@ class OrquestradorAgent:
             
             if info_comando["tipo"] == "erro":
                 return info_comando
+            
+            # Atualiza o estado com informações do comando
+            self.estado.atualizar(
+                ultimo_comando=mensagem,
+                diretorio_atual=info_comando.get("diretorio_atual")
+            )
             
             # Processa o comando de acordo com o tipo
             if info_comando["tipo_comando"] == "diretorio":
