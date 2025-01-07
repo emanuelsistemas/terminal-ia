@@ -64,19 +64,26 @@ class StreamingState:
         if not self.fluxo_atual:
             return "Nenhum fluxo em andamento"
         
-        mensagem = "🔄 Fluxo de Trabalho:\n\n"
+        mensagem = "🤖 Fluxo de Processamento:\n\n"
         
         for estado in self.fluxo_atual:
             # Formata o timestamp para hora:minuto:segundo
             timestamp = datetime.fromisoformat(estado["timestamp"]).strftime("%H:%M:%S")
             
-            mensagem += f"[{timestamp}] {estado['agente']}:\n"
-            mensagem += f"  {estado['acao']}\n"
+            # Formata a linha do agente
+            linha_agente = f"[{timestamp}] {estado['agente']}:\n"
             
-            if "descricao" in estado:
-                mensagem += f"  └─ {estado['descricao']}\n"
+            # Formata a linha da ação
+            linha_acao = f"  {estado['acao']}\n"
             
-            mensagem += "\n"
+            # Adiciona a descrição se existir
+            linha_descricao = f"  └─ {estado['descricao']}\n" if "descricao" in estado else ""
+            
+            # Adiciona uma linha em branco após cada estado
+            mensagem += linha_agente + linha_acao + linha_descricao + "\n"
+        
+        # Adiciona uma linha divisória no final
+        mensagem += "─" * 40 + "\n"
         
         return mensagem
     
