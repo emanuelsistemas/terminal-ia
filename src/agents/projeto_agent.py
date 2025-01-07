@@ -28,7 +28,7 @@ class ProjetoAgent:
             package_json = {
                 "name": nome_projeto,
                 "version": "1.0.0",
-                "private": true,
+                "private": True,
                 "dependencies": {
                     "react": "^18.2.0",
                     "react-dom": "^18.2.0",
@@ -110,7 +110,7 @@ const {nome_pagina}: React.FC = () => {{
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">{nome_pagina}</h1>
-      {/* Conteúdo da página aqui */}
+      {/* TODO: Adicionar conteúdo da página */}
     </div>
   );
 }};
