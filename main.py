@@ -1,61 +1,60 @@
-import os
-import sys
 import logging
+import os
 from dotenv import load_dotenv
+from src.telegram_bot import TelegramInterface
 
-# Configura logging
+# Configuração de logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
 logger = logging.getLogger(__name__)
 
-# Importa o bot
-from src.telegram_bot import TelegramInterface
-
-def carregar_variaveis_ambiente():
-    """Carrega as variáveis de ambiente do arquivo .env"""
-    # Carrega variáveis do .env
-    load_dotenv()
-    
-    # Verifica variáveis obrigatórias
-    variaveis = {
-        "TELEGRAM_BOT_TOKEN": os.getenv("TELEGRAM_BOT_TOKEN"),
-        "GROQ_API_KEY": os.getenv("GROQ_API_KEY")
-    }
-    
-    # Verifica se todas as variáveis estão presentes
-    faltando = [k for k, v in variaveis.items() if not v]
-    if faltando:
-        logger.error(f"❌ Erro: Variáveis de ambiente faltando: {', '.join(faltando)}")
-        sys.exit(1)
-    
-    return variaveis
+def setup_env():
+    """Carrega variáveis de ambiente"""
+    try:
+        # Tenta carregar do .env
+        load_dotenv()
+        
+        # Verifica variáveis obrigatórias
+        required_vars = [
+            "TELEGRAM_BOT_TOKEN",
+            "GROQ_API_KEY",
+        ]
+        
+        missing = [var for var in required_vars if not os.getenv(var)]
+        
+        if missing:
+            logger.error(f"❌ Variáveis de ambiente faltando: {missing}")
+            return False
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao carregar variáveis de ambiente: {e}")
+        return False
 
 def main():
-    """Função principal do bot"""
+    """Função principal"""
     try:
         logger.info("Iniciando NexusIA Bot...")
         
         # Carrega variáveis de ambiente
-        env = carregar_variaveis_ambiente()
+        if not setup_env():
+            logger.error("❌ Falha ao carregar configurações")
+            return
         
-        # Inicializa o bot
+        # Inicializa e executa o bot
         bot = TelegramInterface(
-            token=env["TELEGRAM_BOT_TOKEN"],
-            groq_api_key=env["GROQ_API_KEY"],
-            deepseek_api_key=None
+            token=os.getenv("TELEGRAM_BOT_TOKEN"),
+            groq_api_key=os.getenv("GROQ_API_KEY")
         )
-        
-        logger.info("Bot inicializado, iniciando execução...")
-        
-        # Inicia o bot
         bot.start()
         
     except Exception as e:
-        logger.error(f"❌ Erro fatal: {str(e)}")
-        logger.error(f"Traceback:", exc_info=True)
-        sys.exit(1)
+        logger.error(f"❌ Erro fatal: {e}")
+        logger.error("Traceback:", exc_info=True)
 
 if __name__ == "__main__":
     main()
