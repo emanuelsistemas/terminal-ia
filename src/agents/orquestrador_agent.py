@@ -55,12 +55,13 @@ class OrquestradorAgent:
                 "processando"
             )
             is_comando = await self.comando.is_comando(mensagem)
-            self.streaming.atualizar_ultimo_estado(
-                "sucesso" if is_comando else "processando",
-                "É um comando" if is_comando else "Não é um comando"
-            )
             
             if is_comando:
+                self.streaming.atualizar_ultimo_estado(
+                    "sucesso",
+                    "É um comando"
+                )
+                
                 # Se for comando, processa como comando
                 logger.info("Processando como comando")
                 self.streaming.adicionar_estado(
@@ -75,6 +76,11 @@ class OrquestradorAgent:
                 else:
                     self.streaming.atualizar_ultimo_estado("erro")
             else:
+                self.streaming.atualizar_ultimo_estado(
+                    "sucesso",
+                    "Não é um comando"
+                )
+                
                 # Se não for comando, processa como conversa normal
                 logger.info("Processando como conversa normal")
                 self.streaming.adicionar_estado(
@@ -165,6 +171,10 @@ class OrquestradorAgent:
                 return info_comando
             
             self.streaming.atualizar_ultimo_estado("sucesso")
+            
+            # Se for uma pergunta, retorna direto
+            if info_comando["tipo"] == "pergunta":
+                return info_comando
             
             # Atualiza o estado com informações do comando
             if info_comando["tipo_comando"] == "projeto":

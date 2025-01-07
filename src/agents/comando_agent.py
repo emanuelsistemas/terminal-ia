@@ -116,10 +116,10 @@ class ComandoAgent:
                     "resposta": f"✅ {'Arquivo' if comando == '/touch' else 'Diretório'} {partes[1]} criado"
                 }
             
-            # Se não é um comando conhecido, processa como conversa normal
+            # Se não é um comando conhecido, retorna erro
             return {
-                "tipo": "conversa",
-                "resposta": mensagem
+                "tipo": "erro",
+                "resposta": f"❌ Comando não reconhecido. Use /help para ver os comandos disponíveis."
             }
             
         except Exception as e:
