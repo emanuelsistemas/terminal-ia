@@ -39,7 +39,8 @@ class OrquestradorAgent:
             self.memory.add_message(chat_id, "user", mensagem)
             
             # Obtém contexto relevante
-            contexto = self.memory.get_context(chat_id, mensagem)
+            contexto = await self.memory.get_context(chat_id, mensagem)
+            logger.info(f"Contexto encontrado: {contexto}")
             
             # Analisa a mensagem para determinar o tipo
             analise = await self.analisador.analisar_mensagem(mensagem, self.modelo_analise)
