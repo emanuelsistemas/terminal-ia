@@ -1,6 +1,7 @@
 from typing import Dict, List
 import logging
 from openai import OpenAI
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +12,15 @@ class ConversaAgent:
     async def processar_mensagem(self, mensagem: str, contexto: Dict = None) -> Dict:
         """Processa uma mensagem de conversa normal usando o contexto disponível"""
         try:
+            # Verifica se é uma pergunta sobre data/hora
+            if self._is_datetime_query(mensagem):
+                now = datetime.now()
+                return {
+                    "sucesso": True,
+                    "resposta": f"Hoje é {now.strftime('%d/%m/%Y')} às {now.strftime('%H:%M')}.",
+                    "modelo": "realtime"
+                }
+            
             # Prepara as mensagens com o contexto
             messages = [{
                 "role": "system",
@@ -27,16 +37,6 @@ class ConversaAgent:
                 - Se vier da memória curta (short_term), use naturalmente
                 - Se vier da memória longa (long_term), mencione "Lembro que falamos sobre isso antes..."
                 - Se vier da web (web), cite "Segundo [fonte]..."
-                
-                Exemplos de respostas:
-                [Com contexto recente]
-                "Como falamos antes, podemos usar PostgreSQL para isso..."
-                
-                [Com contexto antigo]
-                "Lembro que falamos sobre isso antes. Na época decidimos usar..."
-                
-                [Com dados da web]
-                "Segundo a documentação oficial do FastAPI..."
                 """
             }]
             
@@ -86,6 +86,15 @@ class ConversaAgent:
                 "resposta": "Deu um erro aqui. Tenta de novo?",
                 "modelo": "mixtral-8x7b-32768"
             }
+    
+    def _is_datetime_query(self, query: str) -> bool:
+        """Verifica se a query é sobre data ou hora"""
+        datetime_keywords = [
+            "que dia", "qual dia", "data", "hora", "que horas",
+            "qual a data", "dia de hoje", "hora atual"
+        ]
+        query = query.lower()
+        return any(keyword in query for keyword in datetime_keywords)
     
     async def formatar_resposta(self, resultado: Dict, tipo_comando: str) -> str:
         """Formata o resultado de uma operação usando LLM"""
