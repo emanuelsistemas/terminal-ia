@@ -6,6 +6,7 @@ from .conversa_agent import ConversaAgent
 from .comando_agent import ComandoAgent
 from .diretorio_agent import DiretorioAgent
 from .file_agent import FileAgent
+from ..memory import Memory
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,9 @@ class OrquestradorAgent:
         self.diretorio = DiretorioAgent()
         self.file = FileAgent()
         
+        # Inicializa o sistema de memória
+        self.memory = Memory()
+        
         logger.info("OrquestradorAgent inicializado com sucesso")
     
     async def processar_mensagem(self, mensagem: str, chat_id: int) -> Dict:
@@ -38,7 +42,19 @@ class OrquestradorAgent:
             else:
                 # Se não for comando, processa como conversa normal
                 logger.info("Processando como conversa normal")
-                return await self.processar_conversa(mensagem)
+                
+                # Busca contexto relevante
+                contexto = self.memory.get_context(chat_id, mensagem)
+                
+                # Processa a mensagem com o contexto
+                resultado = await self.conversa.processar_mensagem(mensagem, contexto)
+                
+                # Se processou com sucesso, salva na memória
+                if resultado["sucesso"]:
+                    self.memory.add_message(chat_id, "user", mensagem)
+                    self.memory.add_message(chat_id, "assistant", resultado["resposta"])
+                
+                return resultado
             
         except Exception as e:
             logger.error(f"Erro no OrquestradorAgent: {e}")
@@ -88,19 +104,4 @@ class OrquestradorAgent:
             return {
                 "tipo": "erro",
                 "mensagem": "Erro ao processar o comando"
-            }
-    
-    async def processar_conversa(self, mensagem: str) -> Dict:
-        """Processa uma conversa normal"""
-        try:
-            # Por enquanto, apenas passa para o ConversaAgent
-            resultado = await self.conversa.processar_mensagem(mensagem)
-            resultado["tipo"] = "conversa"
-            return resultado
-            
-        except Exception as e:
-            logger.error(f"Erro ao processar conversa: {e}")
-            return {
-                "tipo": "erro",
-                "mensagem": "Erro ao processar a mensagem"
             }

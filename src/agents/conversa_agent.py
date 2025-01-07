@@ -30,6 +30,27 @@ class ConversaAgent:
                     """
             }]
             
+            # Adiciona contexto se disponível
+            if contexto and contexto.get("found", False):
+                # Adiciona mensagem sobre a fonte do contexto
+                if contexto["source"] == "short_term":
+                    messages.append({
+                        "role": "system",
+                        "content": "As informações a seguir vêm da nossa conversa atual."
+                    })
+                elif contexto["source"] == "long_term":
+                    messages.append({
+                        "role": "system",
+                        "content": "As informações a seguir vêm de conversas anteriores armazenadas na memória."
+                    })
+                
+                # Adiciona o contexto encontrado
+                for msg in contexto["context"]:
+                    messages.append({
+                        "role": msg["role"],
+                        "content": msg["content"]
+                    })
+            
             # Adiciona a mensagem atual
             messages.append({
                 "role": "user",
