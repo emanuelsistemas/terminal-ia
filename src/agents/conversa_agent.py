@@ -8,49 +8,54 @@ class ConversaAgent:
     def __init__(self, client: OpenAI):
         self.client = client
     
-    async def processar_mensagem(self, mensagem: str, contexto: List[Dict] = None) -> Dict:
+    async def processar_mensagem(self, mensagem: str, contexto: Dict = None) -> Dict:
         """Processa uma mensagem de conversa normal usando o contexto disponível"""
         try:
             # Prepara as mensagens com o contexto
             messages = [{
                 "role": "system",
-                "content": """Você é o Nexus, um especialista em Linux e desenvolvimento.
+                "content": """Você é o Nexus, um assistente especializado em Linux e desenvolvimento.
                 
                 Importante:
-                - Seja proativo e sugira soluções práticas
-                - Foque em ideias e exemplos concretos
-                - Guie o usuário com perguntas específicas quando necessário
-                - Sugira tecnologias e ferramentas relevantes
-                - Use sua experiência para dar dicas práticas
-                - Mantenha um tom direto e profissional
+                - Seja direto e natural nas respostas
+                - Use o contexto disponível de forma inteligente
+                - Quando usar informações da web, cite as fontes
+                - Mantenha um tom profissional mas acessível
+                - Sugira soluções práticas quando relevante
                 
-                Quando o usuário falar de projetos:
-                1. Sugira estruturas e tecnologias específicas
-                2. Dê exemplos de implementação
-                3. Mencione ferramentas úteis
-                4. Proponha próximos passos práticos
+                Sobre o contexto:
+                - Se vier da memória curta (short_term), use naturalmente
+                - Se vier da memória longa (long_term), mencione "Lembro que falamos sobre isso antes..."
+                - Se vier da web (web), cite "Segundo [fonte]..."
                 
-                Exemplos RUINS:
-                "Existem vários sistemas ERP disponíveis..."
-                "Recomendo avaliar diferentes opções..."
+                Exemplos de respostas:
+                [Com contexto recente]
+                "Como falamos antes, podemos usar PostgreSQL para isso..."
                 
-                Exemplos BONS:
-                "Para um ERP fiscal, sugiro começarmos com:
-                1. PostgreSQL para o banco
-                2. FastAPI para a API
-                3. React para o frontend
-                Quer que eu mostre como estruturar?"
+                [Com contexto antigo]
+                "Lembro que falamos sobre isso antes. Na época decidimos usar..."
                 
-                "Vamos começar criando a estrutura base:
-                1. Primeiro o banco de dados
-                2. Depois os endpoints principais
-                Por qual você quer começar?"
+                [Com dados da web]
+                "Segundo a documentação oficial do FastAPI..."
                 """
             }]
             
             # Adiciona contexto se disponível
-            if contexto:
-                for msg in contexto:
+            if contexto and contexto["found"]:
+                # Adiciona mensagem sobre a fonte do contexto
+                if contexto["source"] == "long_term":
+                    messages.append({
+                        "role": "system",
+                        "content": "As informações a seguir vêm de conversas anteriores armazenadas na memória."
+                    })
+                elif contexto["source"] == "web":
+                    messages.append({
+                        "role": "system",
+                        "content": "As informações a seguir vêm de pesquisas web recentes. Cite as fontes."
+                    })
+                
+                # Adiciona o contexto encontrado
+                for msg in contexto["context"]:
                     messages.append({
                         "role": msg["role"],
                         "content": msg["content"]
