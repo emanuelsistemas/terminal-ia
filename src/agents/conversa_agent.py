@@ -11,13 +11,16 @@ class ConversaAgent:
     async def processar_mensagem(self, mensagem: str, contexto: Dict = None) -> Dict:
         """Processa uma mensagem de conversa normal"""
         try:
-            response = self.client.chat.completions.create(
-                model="mixtral-8x7b-32768",
-                messages=[{
-                    "role": "system",
-                    "content": """Você é o Nexus, um assistente especializado em Linux e desenvolvimento.
+            # Prepara as mensagens com o contexto
+            messages = [{
+                "role": "system",
+                "content": """Você é o Nexus, um assistente especializado em Linux e desenvolvimento.
                     
-                    IMPORTANTE: Sempre responda em português do Brasil.
+                    IMPORTANTE: 
+                    - Sempre responda em português do Brasil
+                    - NUNCA invente ou assuma contextos que não foram fornecidos
+                    - Se não tiver contexto anterior, apenas responda a pergunta atual
+                    - Se perguntarem sobre conversas anteriores e não tiver contexto, diga que não tem essa informação
                     
                     Diretrizes:
                     - Seja direto e natural nas respostas
@@ -25,10 +28,17 @@ class ConversaAgent:
                     - Sugira soluções práticas quando relevante
                     - Use português claro e simples
                     """
-                }, {
-                    "role": "user",
-                    "content": mensagem
-                }],
+            }]
+            
+            # Adiciona a mensagem atual
+            messages.append({
+                "role": "user",
+                "content": mensagem
+            })
+            
+            response = self.client.chat.completions.create(
+                model="mixtral-8x7b-32768",
+                messages=messages,
                 temperature=0.7
             )
             
