@@ -6,6 +6,7 @@ from .conversa_agent import ConversaAgent
 from .comando_agent import ComandoAgent
 from .diretorio_agent import DiretorioAgent
 from .file_agent import FileAgent
+from .projeto_agent import ProjetoAgent
 from .estados.estado_projeto import EstadoProjeto
 from ..memory import Memory
 
@@ -24,6 +25,7 @@ class OrquestradorAgent:
         self.comando = ComandoAgent(self.client)
         self.diretorio = DiretorioAgent()
         self.file = FileAgent()
+        self.projeto = ProjetoAgent()
         
         # Inicializa o sistema de memória
         self.memory = Memory()
@@ -83,6 +85,18 @@ class OrquestradorAgent:
                 return info_comando
             
             # Atualiza o estado com informações do comando
+            if info_comando["tipo_comando"] == "projeto":
+                # Cria o projeto
+                resultado = await self.projeto.criar_projeto(info_comando["projeto"])
+                if resultado["tipo"] == "sucesso":
+                    # Atualiza o estado
+                    self.estado.atualizar(
+                        projeto_atual=info_comando["projeto"],
+                        diretorio_atual=info_comando["diretorio_atual"]
+                    )
+                return resultado
+            
+            # Atualiza o estado com outras informações
             self.estado.atualizar(
                 ultimo_comando=mensagem,
                 diretorio_atual=info_comando.get("diretorio_atual")
