@@ -16,25 +16,34 @@ class ConversaAgent:
                 contexto = []
             
             # Adiciona o prompt do sistema
-            contexto = [
+            sistema_prompt = [
                 {
                     "role": "system",
                     "content": """Você é um assistente especializado em desenvolvimento web com React e TypeScript.
                     Você ajuda a criar e organizar projetos, sempre sugerindo as melhores práticas.
                     Use emojis para tornar as mensagens mais amigáveis.
                     Seja direto e objetivo nas respostas.
-                    Quando precisar criar arquivos ou estruturas, use os comandos disponíveis.
-                    Sempre mantenha o contexto do projeto atual."""
+                    Quando precisar criar arquivos ou estruturas, sugira usar os comandos disponíveis.
+                    Sempre mantenha o contexto do projeto atual.
+                    
+                    Comandos disponíveis:
+                    /projeto <nome> - Cria um novo projeto
+                    /cd <caminho> - Navega entre diretórios
+                    /touch <arquivo> - Cria um arquivo
+                    /mkdir <diretório> - Cria um diretório
+                    
+                    Responda em português do Brasil."""
                 }
-            ] + contexto
+            ]
             
-            # Adiciona a mensagem do usuário
-            contexto.append({"role": "user", "content": mensagem})
+            mensagens = sistema_prompt + contexto + [
+                {"role": "user", "content": mensagem}
+            ]
             
             # Gera a resposta usando o modelo
             completion = self.client.chat.completions.create(
                 model="mixtral-8x7b-32768",
-                messages=contexto,
+                messages=mensagens,
                 temperature=0.7,
                 max_tokens=2000
             )
