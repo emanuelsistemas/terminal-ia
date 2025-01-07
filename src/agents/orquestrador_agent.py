@@ -1,85 +1,106 @@
-from typing import Dict
+from typing import Dict, Optional
 import logging
 from openai import OpenAI
 
-from .analisador_agent import AnalisadorAgent
 from .conversa_agent import ConversaAgent
+from .comando_agent import ComandoAgent
 from .diretorio_agent import DiretorioAgent
 from .file_agent import FileAgent
-from ..memory import Memory
 
 logger = logging.getLogger(__name__)
 
 class OrquestradorAgent:
-    def __init__(self, groq_api_key: str, deepseek_api_key: str = None):
-        # Inicializa os clientes
-        self.groq_client = OpenAI(api_key=groq_api_key, base_url="https://api.groq.com/openai/v1")
+    def __init__(self, groq_api_key: str):
+        # Inicializa o cliente OpenAI
+        self.client = OpenAI(
+            base_url="https://api.groq.com/openai/v1",
+            api_key=groq_api_key
+        )
         
         # Inicializa os agentes
-        self.analisador = AnalisadorAgent(self.groq_client)
-        self.conversa = ConversaAgent(self.groq_client)
+        self.conversa = ConversaAgent(self.client)
+        self.comando = ComandoAgent(self.client)
         self.diretorio = DiretorioAgent()
         self.file = FileAgent()
         
-        # Inicializa o sistema de memória
-        self.memory = Memory()
-        
-        # Modelo atual para análise
-        self.modelo_analise = "mixtral"
-    
-    def set_modelo_analise(self, modelo: str):
-        """Define qual modelo será usado para análise"""
-        if modelo in ["mixtral", "gpt4", "deepseek"]:
-            self.modelo_analise = modelo
-            logger.info(f"Modelo de análise alterado para: {modelo}")
+        logger.info("OrquestradorAgent inicializado com sucesso")
     
     async def processar_mensagem(self, mensagem: str, chat_id: int) -> Dict:
+        """Processa uma mensagem e retorna a resposta apropriada"""
         try:
-            # Adiciona mensagem do usuário à memória
-            self.memory.add_message(chat_id, "user", mensagem)
+            # Primeiro, tenta identificar se é um comando
+            is_comando = await self.comando.is_comando(mensagem)
             
-            # Obtém contexto relevante
-            contexto = await self.memory.get_context(chat_id, mensagem)
-            logger.info(f"Contexto encontrado: {contexto}")
-            
-            # Analisa a mensagem para determinar o tipo
-            analise = await self.analisador.analisar_mensagem(mensagem, self.modelo_analise)
-            logger.info(f"Análise concluída usando {self.modelo_analise}: {analise}")
-            
-            if not analise["sucesso"]:
-                return {
-                    "tipo": "erro",
-                    "mensagem": "Não consegui entender sua mensagem. Pode tentar de outro jeito?"
-                }
-            
-            # Processa baseado no tipo
-            if analise["tipo"] == "comando_arquivo":
-                resultado = await self.file.processar_comando(
-                    mensagem,
-                    info_comando=analise
-                )
-                if resultado["sucesso"]:
-                    self.memory.add_message(chat_id, "assistant", str(resultado))
-                return {**resultado, "tipo": "comando_arquivo"}
-                
-            elif analise["tipo"] == "comando_diretorio":
-                resultado = await self.diretorio.processar_comando(
-                    mensagem,
-                    info_comando=analise
-                )
-                if resultado["sucesso"]:
-                    self.memory.add_message(chat_id, "assistant", str(resultado))
-                return {**resultado, "tipo": "comando_diretorio"}
-                
-            else:  # conversa normal
-                resultado = await self.conversa.processar_mensagem(mensagem, contexto)
-                if resultado["sucesso"]:
-                    self.memory.add_message(chat_id, "assistant", resultado["resposta"])
-                return {**resultado, "tipo": "conversa"}
+            if is_comando:
+                # Se for comando, processa como comando
+                logger.info("Processando como comando")
+                return await self.processar_comando(mensagem)
+            else:
+                # Se não for comando, processa como conversa normal
+                logger.info("Processando como conversa normal")
+                return await self.processar_conversa(mensagem)
             
         except Exception as e:
-            logger.error(f"Erro ao processar mensagem: {e}")
+            logger.error(f"Erro no OrquestradorAgent: {e}")
             return {
                 "tipo": "erro",
                 "mensagem": "Ocorreu um erro ao processar sua mensagem"
+            }
+    
+    async def processar_comando(self, mensagem: str) -> Dict:
+        """Processa um comando identificado"""
+        try:
+            # Analisa o comando
+            comando = await self.comando.analisar_comando(mensagem)
+            
+            if not comando["sucesso"]:
+                return {
+                    "tipo": "erro",
+                    "mensagem": comando["erro"]
+                }
+            
+            # Executa baseado no tipo
+            if comando["tipo"] == "criar_arquivo":
+                resultado = await self.file.criar_arquivo(
+                    comando["info"]["nome"],
+                    comando["info"]["conteudo"],
+                    comando["info"].get("caminho", "")
+                )
+                resultado["tipo"] = "comando_arquivo"
+                return resultado
+                
+            elif comando["tipo"] == "criar_diretorio":
+                resultado = await self.diretorio.criar_diretorio(
+                    comando["info"]["nome"],
+                    comando["info"].get("caminho", "")
+                )
+                resultado["tipo"] = "comando_diretorio"
+                return resultado
+            
+            else:
+                return {
+                    "tipo": "erro",
+                    "mensagem": "Tipo de comando não suportado"
+                }
+            
+        except Exception as e:
+            logger.error(f"Erro ao processar comando: {e}")
+            return {
+                "tipo": "erro",
+                "mensagem": "Erro ao processar o comando"
+            }
+    
+    async def processar_conversa(self, mensagem: str) -> Dict:
+        """Processa uma conversa normal"""
+        try:
+            # Por enquanto, apenas passa para o ConversaAgent
+            resultado = await self.conversa.processar_mensagem(mensagem)
+            resultado["tipo"] = "conversa"
+            return resultado
+            
+        except Exception as e:
+            logger.error(f"Erro ao processar conversa: {e}")
+            return {
+                "tipo": "erro",
+                "mensagem": "Erro ao processar a mensagem"
             }

@@ -12,15 +12,6 @@ class ConversaAgent:
     async def processar_mensagem(self, mensagem: str, contexto: Dict = None) -> Dict:
         """Processa uma mensagem de conversa normal usando o contexto disponível"""
         try:
-            # Verifica se é uma pergunta sobre data/hora
-            if self._is_datetime_query(mensagem):
-                now = datetime.now()
-                return {
-                    "sucesso": True,
-                    "resposta": f"Hoje é {now.strftime('%d/%m/%Y')} às {now.strftime('%H:%M')}.",
-                    "modelo": "realtime"
-                }
-            
             # Prepara as mensagens com o contexto
             messages = [{
                 "role": "system",
@@ -41,7 +32,7 @@ class ConversaAgent:
             }]
             
             # Adiciona contexto se disponível
-            if contexto and contexto["found"]:
+            if contexto and contexto.get("found", False):
                 # Adiciona mensagem sobre a fonte do contexto
                 if contexto["source"] == "long_term":
                     messages.append({
@@ -67,6 +58,8 @@ class ConversaAgent:
                 "content": mensagem
             })
             
+            logger.info(f"Enviando mensagem para o modelo: {messages}")
+            
             response = self.client.chat.completions.create(
                 model="mixtral-8x7b-32768",
                 messages=messages,
@@ -86,15 +79,6 @@ class ConversaAgent:
                 "resposta": "Deu um erro aqui. Tenta de novo?",
                 "modelo": "mixtral-8x7b-32768"
             }
-    
-    def _is_datetime_query(self, query: str) -> bool:
-        """Verifica se a query é sobre data ou hora"""
-        datetime_keywords = [
-            "que dia", "qual dia", "data", "hora", "que horas",
-            "qual a data", "dia de hoje", "hora atual"
-        ]
-        query = query.lower()
-        return any(keyword in query for keyword in datetime_keywords)
     
     async def formatar_resposta(self, resultado: Dict, tipo_comando: str) -> str:
         """Formata o resultado de uma operação usando LLM"""
