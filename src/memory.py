@@ -4,7 +4,6 @@ import logging
 import json
 from pathlib import Path
 import chromadb
-import requests
 
 logger = logging.getLogger(__name__)
 
@@ -22,205 +21,77 @@ class Memory:
         self.client = chromadb.PersistentClient(path=str(self.chroma_dir))
         self.collection = self.client.get_or_create_collection("chat_memory")
         
-        # Memória de curto prazo por chat
-        self.short_term: Dict[int, List[Dict]] = {}
-        
-        # URL para pesquisa web
-        self.search_url = "https://serpapi.com/search"
-        self.serpapi_key = "sua_chave_aqui"  # Você precisará de uma chave da SerpAPI
+        # Cache das últimas 10 mensagens por chat
+        self.message_cache: Dict[int, List[Dict]] = {}
         
         logger.info("Sistema de memória inicializado")
     
     def add_message(self, chat_id: int, role: str, content: str) -> None:
-        """Adiciona uma mensagem à memória de curto prazo"""
-        if chat_id not in self.short_term:
-            self.short_term[chat_id] = []
-        
-        # Adiciona à memória de curto prazo
-        message = {
-            "role": role,
-            "content": content,
-            "timestamp": datetime.now().isoformat()
-        }
-        self.short_term[chat_id].append(message)
-        
-        # Se exceder 10 mensagens, move as mais antigas para o ChromaDB
-        if len(self.short_term[chat_id]) > 10:
-            oldest = self.short_term[chat_id].pop(0)
-            self._add_to_long_term(chat_id, oldest)
-    
-    def get_context(self, chat_id: int, query: str) -> Dict:
-        """Obtém o contexto relevante para uma query, seguindo a hierarquia:
-        1. Memória curta (últimas 10 mensagens)
-        2. ChromaDB (memória longa)
-        3. Informações em tempo real (data, hora, etc)
-        4. Pesquisa web (último recurso)
-        """
-        response = {
-            "source": None,  # short_term, long_term, realtime ou web
-            "context": [],
-            "found": False
-        }
-        
-        # Verifica se é uma pergunta sobre data/hora
-        if self._is_datetime_query(query):
-            now = datetime.now()
-            response["source"] = "realtime"
-            response["context"] = [{
-                "role": "system",
-                "content": f"Informação em tempo real: Hoje é {now.strftime('%d/%m/%Y')} às {now.strftime('%H:%M')}.",
-                "timestamp": now.isoformat()
-            }]
-            response["found"] = True
-            return response
-        
-        # 1. Primeiro tenta na memória de curto prazo
-        if chat_id in self.short_term:
-            recent_context = self.short_term[chat_id]
-            if self._is_relevant(query, recent_context):
-                response["source"] = "short_term"
-                response["context"] = recent_context
-                response["found"] = True
-                return response
-        
-        # 2. Se não encontrar, busca no ChromaDB
-        long_term = self._search_long_term(chat_id, query)
-        if long_term:
-            response["source"] = "long_term"
-            response["context"] = long_term
-            response["found"] = True
-            return response
-        
-        # 3. Se ainda não encontrar, tenta buscar na web
-        web_results = self._search_web(query)
-        if web_results:
-            response["source"] = "web"
-            response["context"] = web_results
-            response["found"] = True
-            return response
-        
-        # Se não encontrar nada, retorna vazio
-        return response
-    
-    def _is_datetime_query(self, query: str) -> bool:
-        """Verifica se a query é sobre data ou hora"""
-        datetime_keywords = [
-            "que dia", "qual dia", "data", "hora", "que horas",
-            "qual a data", "dia de hoje", "hora atual"
-        ]
-        query = query.lower()
-        return any(keyword in query for keyword in datetime_keywords)
-    
-    def _is_relevant(self, query: str, context: List[Dict]) -> bool:
-        """Verifica se o contexto recente é relevante para a query"""
-        # Implementação simples - pode ser melhorada com análise de similaridade
-        query_words = set(query.lower().split())
-        
-        # Verifica se há palavras em comum
-        for message in context:
-            content_words = set(message["content"].lower().split())
-            if len(query_words.intersection(content_words)) > 1:
-                return True
-        
-        return False
-    
-    def _add_to_long_term(self, chat_id: int, message: Dict) -> None:
-        """Adiciona uma mensagem à memória de longo prazo (ChromaDB)"""
+        """Adiciona uma mensagem à memória"""
         try:
-            # Prepara metadados
-            metadata = {
-                "chat_id": str(chat_id),
-                "role": message["role"],
-                "timestamp": message["timestamp"]
+            # Prepara a mensagem
+            message = {
+                "role": role,
+                "content": content,
+                "timestamp": datetime.now().isoformat()
             }
             
-            # Adiciona ao ChromaDB
+            # Adiciona ao cache de mensagens recentes
+            if chat_id not in self.message_cache:
+                self.message_cache[chat_id] = []
+            
+            self.message_cache[chat_id].append(message)
+            
+            # Mantém apenas as últimas 10 mensagens no cache
+            if len(self.message_cache[chat_id]) > 10:
+                self.message_cache[chat_id].pop(0)
+            
+            # Salva no ChromaDB
             self.collection.add(
-                documents=[message["content"]],
-                metadatas=[metadata],
-                ids=[f"{chat_id}_{datetime.now().timestamp()}"]
+                documents=[json.dumps(message)],
+                metadatas=[{"chat_id": str(chat_id)}],
+                ids=[f"{chat_id}_{datetime.now().timestamp()}"],
             )
             
-            logger.info(f"Mensagem adicionada à memória de longo prazo para chat {chat_id}")
-            
         except Exception as e:
-            logger.error(f"Erro ao adicionar à memória de longo prazo: {e}")
+            logger.error(f"Erro ao adicionar mensagem: {e}")
     
-    def _search_long_term(self, chat_id: int, query: str, n_results: int = 5) -> List[Dict]:
-        """Busca mensagens relevantes na memória de longo prazo"""
+    def get_context(self, chat_id: int, query: str) -> Dict:
+        """Obtém o contexto relevante para uma query"""
         try:
+            # Primeiro tenta encontrar nas mensagens recentes
+            if chat_id in self.message_cache and self.message_cache[chat_id]:
+                return {
+                    "found": True,
+                    "source": "short_term",
+                    "context": self.message_cache[chat_id]
+                }
+            
+            # Se não encontrou no cache, busca no ChromaDB
             results = self.collection.query(
                 query_texts=[query],
                 where={"chat_id": str(chat_id)},
-                n_results=n_results
+                n_results=5
             )
             
-            # Formata resultados
-            messages = []
-            for i in range(len(results["documents"][0])):
-                messages.append({
-                    "role": results["metadatas"][0][i]["role"],
-                    "content": results["documents"][0][i],
-                    "timestamp": results["metadatas"][0][i]["timestamp"]
-                })
+            if results and results["documents"][0]:
+                context = [json.loads(doc) for doc in results["documents"][0]]
+                return {
+                    "found": True,
+                    "source": "long_term",
+                    "context": context
+                }
             
-            return messages
-            
-        except Exception as e:
-            logger.error(f"Erro ao buscar na memória de longo prazo: {e}")
-            return []
-    
-    def _search_web(self, query: str) -> List[Dict]:
-        """Realiza uma pesquisa web como último recurso"""
-        try:
-            # Primeiro tenta com DuckDuckGo
-            ddg_url = "https://ddg-api.herokuapp.com/search"
-            response = requests.get(
-                ddg_url,
-                params={"query": query, "limit": 3}
-            )
-            
-            if response.status_code == 200:
-                results = response.json()
-                messages = []
-                for result in results:
-                    messages.append({
-                        "role": "system",
-                        "content": f"Segundo {result.get('link')}: {result.get('snippet')}",
-                        "timestamp": datetime.now().isoformat()
-                    })
-                return messages
-            
-            # Se falhar, tenta com Google (requer API key)
-            if self.serpapi_key != "sua_chave_aqui":
-                response = requests.get(
-                    self.search_url,
-                    params={
-                        "q": query,
-                        "api_key": self.serpapi_key,
-                        "engine": "google"
-                    }
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    organic_results = data.get("organic_results", [])
-                    messages = []
-                    for result in organic_results[:3]:
-                        messages.append({
-                            "role": "system",
-                            "content": f"Segundo {result.get('link')}: {result.get('snippet')}",
-                            "timestamp": datetime.now().isoformat()
-                        })
-                    return messages
-            
-            return []
+            return {
+                "found": False,
+                "source": None,
+                "context": []
+            }
             
         except Exception as e:
-            logger.error(f"Erro ao realizar pesquisa web: {e}")
-            return []
-    
-    def clear_chat(self, chat_id: int) -> None:
-        """Limpa a memória de curto prazo de um chat"""
-        if chat_id in self.short_term:
-            del self.short_term[chat_id]
+            logger.error(f"Erro ao buscar contexto: {e}")
+            return {
+                "found": False,
+                "source": None,
+                "context": []
+            }
