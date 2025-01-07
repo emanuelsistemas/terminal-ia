@@ -2,6 +2,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from typing import Dict, Any
 import logging
+import traceback
 
 from .agents.orquestrador_agent import OrquestradorAgent
 
@@ -47,32 +48,36 @@ class TelegramInterface:
         mensagem = update.message.text
         
         # Log da mensagem recebida
-        logger.info(f"Mensagem recebida do chat {chat_id}")
-        
-        # Indica que está digitando
-        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+        logger.info(f"Mensagem recebida do chat {chat_id}: {mensagem}")
         
         try:
+            # Indica que está digitando
+            await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+            
             # Processa a mensagem
             resultado = await self.orquestrador.processar_mensagem(mensagem, chat_id)
             
+            # Log do resultado
+            logger.info(f"Resultado do processamento: {resultado}")
+            
             # Envia a resposta
-            if resultado["tipo"] == "erro":
+            if resultado.get("tipo") == "erro":
                 await update.message.reply_text(resultado["mensagem"])
                 return
             
-            if resultado["tipo"] in ["comando_arquivo", "comando_diretorio"]:
-                if resultado["sucesso"]:
+            if resultado.get("tipo") in ["comando_arquivo", "comando_diretorio"]:
+                if resultado.get("sucesso"):
                     await update.message.reply_text("Operação realizada com sucesso.")
                 else:
                     await update.message.reply_text(resultado["mensagem"])
             
             else:  # conversa normal
-                if resultado["sucesso"]:
+                if resultado.get("sucesso"):
                     await update.message.reply_text(resultado["resposta"])
                 else:
-                    await update.message.reply_text("Erro: " + resultado["resposta"])
+                    await update.message.reply_text("Erro: " + resultado.get("resposta", "Erro desconhecido"))
             
         except Exception as e:
             logger.error(f"Erro ao processar mensagem: {e}")
-            await update.message.reply_text("Erro: Ocorreu um erro ao processar sua mensagem")
+            logger.error("Traceback completo:", exc_info=True)
+            await update.message.reply_text("Erro: Ocorreu um erro ao processar sua mensagem. Detalhes: " + str(e))
