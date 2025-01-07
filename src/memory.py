@@ -26,6 +26,13 @@ class Memory:
         
         logger.info("Sistema de memória inicializado")
     
+    def add_interaction(self, chat_id: int, user_message: str, bot_response: str) -> None:
+        """Adiciona uma interação completa (mensagem do usuário e resposta do bot) à memória"""
+        # Adiciona mensagem do usuário
+        self.add_message(chat_id, "user", user_message)
+        # Adiciona resposta do bot
+        self.add_message(chat_id, "assistant", bot_response)
+    
     def add_message(self, chat_id: int, role: str, content: str) -> None:
         """Adiciona uma mensagem à memória"""
         try:
@@ -50,48 +57,24 @@ class Memory:
             self.collection.add(
                 documents=[json.dumps(message)],
                 metadatas=[{"chat_id": str(chat_id)}],
-                ids=[f"{chat_id}_{datetime.now().timestamp()}"],
-            )
+                ids=[f"{chat_id}_{datetime.now().timestamp()}"])
             
         except Exception as e:
-            logger.error(f"Erro ao adicionar mensagem: {e}")
+            logger.error(f"Erro ao adicionar mensagem à memória: {e}")
     
-    def get_context(self, chat_id: int, query: str) -> Dict:
-        """Obtém o contexto relevante para uma query"""
+    def get_context(self, chat_id: int, current_message: str) -> List[Dict]:
+        """Retorna o contexto relevante para uma mensagem"""
         try:
-            # Primeiro tenta encontrar nas mensagens recentes
-            if chat_id in self.message_cache and self.message_cache[chat_id]:
-                return {
-                    "found": True,
-                    "source": "short_term",
-                    "context": self.message_cache[chat_id]
-                }
+            # Primeiro, pega as últimas mensagens do cache
+            context = []
+            if chat_id in self.message_cache:
+                context.extend([
+                    {"role": msg["role"], "content": msg["content"]}
+                    for msg in self.message_cache[chat_id][-5:]
+                ])
             
-            # Se não encontrou no cache, busca no ChromaDB
-            results = self.collection.query(
-                query_texts=[query],
-                where={"chat_id": str(chat_id)},
-                n_results=5
-            )
-            
-            if results and results["documents"][0]:
-                context = [json.loads(doc) for doc in results["documents"][0]]
-                return {
-                    "found": True,
-                    "source": "long_term",
-                    "context": context
-                }
-            
-            return {
-                "found": False,
-                "source": None,
-                "context": []
-            }
+            return context
             
         except Exception as e:
             logger.error(f"Erro ao buscar contexto: {e}")
-            return {
-                "found": False,
-                "source": None,
-                "context": []
-            }
+            return []

@@ -38,7 +38,7 @@ class OrquestradorAgent:
             if is_comando:
                 # Se for comando, processa como comando
                 logger.info("Processando como comando")
-                return await self.processar_comando(mensagem)
+                resultado = await self.processar_comando(mensagem)
             else:
                 # Se não for comando, processa como conversa normal
                 logger.info("Processando como conversa normal")
@@ -50,58 +50,51 @@ class OrquestradorAgent:
                 resultado = await self.conversa.processar_mensagem(mensagem, contexto)
                 
                 # Se processou com sucesso, salva na memória
-                if resultado["sucesso"]:
-                    self.memory.add_message(chat_id, "user", mensagem)
-                    self.memory.add_message(chat_id, "assistant", resultado["resposta"])
-                
-                return resultado
+                if resultado["tipo"] == "sucesso":
+                    self.memory.add_interaction(chat_id, mensagem, resultado["resposta"])
+            
+            return resultado
             
         except Exception as e:
-            logger.error(f"Erro no OrquestradorAgent: {e}")
+            logger.error(f"Erro ao processar mensagem: {e}")
             return {
                 "tipo": "erro",
-                "mensagem": "Ocorreu um erro ao processar sua mensagem"
+                "resposta": f"❌ Desculpe, ocorreu um erro ao processar sua mensagem. Detalhes: {str(e)}"
             }
     
     async def processar_comando(self, mensagem: str) -> Dict:
-        """Processa um comando identificado"""
+        """Processa um comando e retorna o resultado"""
         try:
             # Analisa o comando
-            comando = await self.comando.analisar_comando(mensagem)
+            info_comando = await self.comando.analisar_comando(mensagem)
             
-            if not comando["sucesso"]:
-                return {
-                    "tipo": "erro",
-                    "mensagem": comando["erro"]
-                }
+            if info_comando["tipo"] == "erro":
+                return info_comando
             
-            # Executa baseado no tipo
-            if comando["tipo"] == "criar_arquivo":
-                resultado = await self.file.criar_arquivo(
-                    comando["info"]["nome"],
-                    comando["info"]["conteudo"],
-                    comando["info"].get("caminho", "")
+            # Processa o comando de acordo com o tipo
+            if info_comando["tipo_comando"] == "diretorio":
+                return await self.diretorio.processar_comando(
+                    mensagem,
+                    info_comando.get("diretorio_atual"),
+                    info_comando
                 )
-                resultado["tipo"] = "comando_arquivo"
-                return resultado
                 
-            elif comando["tipo"] == "criar_diretorio":
-                resultado = await self.diretorio.criar_diretorio(
-                    comando["info"]["nome"],
-                    comando["info"].get("caminho", "")
+            elif info_comando["tipo_comando"] == "arquivo":
+                return await self.file.processar_comando(
+                    mensagem,
+                    info_comando.get("diretorio_atual"),
+                    info_comando
                 )
-                resultado["tipo"] = "comando_diretorio"
-                return resultado
             
             else:
                 return {
                     "tipo": "erro",
-                    "mensagem": "Tipo de comando não suportado"
+                    "resposta": "❌ Tipo de comando não suportado"
                 }
             
         except Exception as e:
             logger.error(f"Erro ao processar comando: {e}")
             return {
                 "tipo": "erro",
-                "mensagem": "Erro ao processar o comando"
+                "resposta": f"❌ Desculpe, ocorreu um erro ao processar seu comando. Detalhes: {str(e)}"
             }
