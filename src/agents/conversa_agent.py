@@ -1,7 +1,6 @@
-from typing import Dict, List
+from typing import Dict
 import logging
 from openai import OpenAI
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -10,8 +9,9 @@ class ConversaAgent:
         self.client = client
     
     async def processar_mensagem(self, mensagem: str, contexto: Dict = None) -> Dict:
-        """Processa uma mensagem de conversa normal usando o contexto disponível"""
+        """Processa uma mensagem de conversa normal"""
         try:
+<<<<<<< HEAD
             # Prepara as mensagens com o contexto
             messages = [{
                 "role": "system",
@@ -60,9 +60,23 @@ class ConversaAgent:
             
             logger.info(f"Enviando mensagem para o modelo: {messages}")
             
+=======
+>>>>>>> 06bc870
             response = self.client.chat.completions.create(
                 model="mixtral-8x7b-32768",
-                messages=messages,
+                messages=[{
+                    "role": "system",
+                    "content": """Você é o Nexus, um assistente especializado em Linux e desenvolvimento.
+                    
+                    Importante:
+                    - Seja direto e natural nas respostas
+                    - Mantenha um tom profissional mas acessível
+                    - Sugira soluções práticas quando relevante
+                    """
+                }, {
+                    "role": "user",
+                    "content": mensagem
+                }],
                 temperature=0.7
             )
             
@@ -79,6 +93,7 @@ class ConversaAgent:
                 "resposta": "Deu um erro aqui. Tenta de novo?",
                 "modelo": "mixtral-8x7b-32768"
             }
+<<<<<<< HEAD
     
     async def formatar_resposta(self, resultado: Dict, tipo_comando: str) -> str:
         """Formata o resultado de uma operação usando LLM"""
@@ -140,3 +155,5 @@ class ConversaAgent:
         except Exception as e:
             logger.error(f"Erro ao formatar resposta: {e}")
             return None
+=======
+>>>>>>> 06bc870
