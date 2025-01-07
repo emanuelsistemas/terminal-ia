@@ -10,10 +10,13 @@ class ProjetoAgent:
         self.workspace = "/root/projetos"
         logger.info(f"✓ Workspace configurado em {self.workspace}")
     
-    async def criar_projeto(self, nome_projeto: str) -> Dict:
+    async def criar_projeto(self, nome_projeto: str, caminho_base: Optional[str] = None) -> Dict:
         """Cria um novo projeto com a estrutura básica"""
         try:
             # Define o caminho do projeto
+            if caminho_base:
+                self.workspace = caminho_base
+            
             caminho_projeto = os.path.join(self.workspace, nome_projeto)
             
             # Cria a estrutura de diretórios
@@ -110,7 +113,6 @@ const {nome_pagina}: React.FC = () => {{
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">{nome_pagina}</h1>
-      {/* TODO: Adicionar conteúdo da página */}
     </div>
   );
 }};

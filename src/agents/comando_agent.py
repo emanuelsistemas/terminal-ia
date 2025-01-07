@@ -1,49 +1,71 @@
 from typing import Dict, Optional
 import logging
-import osimport shutil
+import os
+import shutil
 
 logger = logging.getLogger(__name__)
 
 class ComandoAgent:
     def __init__(self, client):
         self.client = client
+        self.estado_comando = {}
     
     async def is_comando(self, mensagem: str) -> bool:
         """Verifica se a mensagem é um comando"""
-        return mensagem.startswith("/")
+        return mensagem.startswith("/") or self.estado_comando.get("aguardando_resposta")
     
     async def analisar_comando(self, mensagem: str) -> Dict:
         """Analisa um comando e retorna informações sobre ele"""
         try:
+            # Se estamos aguardando uma resposta para um comando em andamento
+            if self.estado_comando.get("aguardando_resposta"):
+                comando_atual = self.estado_comando["comando"]
+                
+                if comando_atual == "/projeto":
+                    if self.estado_comando.get("aguardando") == "nome":
+                        # Recebemos o nome do projeto
+                        self.estado_comando["nome_projeto"] = mensagem
+                        self.estado_comando["aguardando"] = "caminho"
+                        
+                        return {
+                            "tipo": "pergunta",
+                            "resposta": "📂 Qual será o caminho da pasta principal do projeto? (Ex: /root/projetos)"
+                        }
+                        
+                    elif self.estado_comando.get("aguardando") == "caminho":
+                        # Recebemos o caminho do projeto
+                        caminho = mensagem
+                        nome_projeto = self.estado_comando["nome_projeto"]
+                        
+                        # Limpa o estado
+                        self.estado_comando = {}
+                        
+                        # Retorna as informações para criar o projeto
+                        return {
+                            "tipo": "sucesso",
+                            "tipo_comando": "projeto",
+                            "projeto": nome_projeto,
+                            "caminho_base": caminho,
+                            "diretorio_atual": os.path.join(caminho, nome_projeto),
+                            "resposta": f"✅ Criando projeto {nome_projeto} em {caminho}..."
+                        }
+            
+            # Se é um novo comando
             partes = mensagem.split()
             comando = partes[0].lower()
             
             # Comandos de projeto
             if comando == "/projeto":
-                if len(partes) < 2:
-                    return {
-                        "tipo": "erro",
-                        "resposta": "❌ Por favor, especifique o nome do projeto"
-                    }
-                
-                nome_projeto = partes[1]
-                caminho_projeto = f"/root/projetos/{nome_projeto}"
-                
-                # Cria o diretório do projeto se não existir
-                if not os.path.exists(caminho_projeto):
-                    os.makedirs(caminho_projeto)
-                    os.makedirs(f"{caminho_projeto}/src")
-                    os.makedirs(f"{caminho_projeto}/src/components")
-                    os.makedirs(f"{caminho_projeto}/src/pages")
-                    os.makedirs(f"{caminho_projeto}/src/services")
-                    os.makedirs(f"{caminho_projeto}/src/types")
+                # Inicia o processo de criação do projeto
+                self.estado_comando = {
+                    "comando": "/projeto",
+                    "aguardando_resposta": True,
+                    "aguardando": "nome"
+                }
                 
                 return {
-                    "tipo": "sucesso",
-                    "tipo_comando": "projeto",
-                    "projeto": nome_projeto,
-                    "diretorio_atual": caminho_projeto,
-                    "resposta": f"✅ Projeto {nome_projeto} configurado em {caminho_projeto}"
+                    "tipo": "pergunta",
+                    "resposta": "🚀 Legal! Vamos criar um novo projeto. Qual será o nome dele?"
                 }
             
             # Comandos de branch
