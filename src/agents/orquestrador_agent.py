@@ -69,12 +69,26 @@ class OrquestradorAgent:
                     "Processando comando",
                     "processando"
                 )
-                resultado = await self.processar_comando(mensagem)
+                resultado = await self.comando.analisar_comando(mensagem)
                 
                 if resultado["tipo"] == "sucesso":
                     self.streaming.atualizar_ultimo_estado("sucesso")
                 else:
                     self.streaming.atualizar_ultimo_estado("erro")
+                    
+                # Se o comando não foi reconhecido, processa como conversa
+                if resultado["tipo"] == "erro" and "não reconhecido" in resultado["resposta"]:
+                    self.streaming.adicionar_estado(
+                        "ConversaAgent",
+                        "Processando como conversa",
+                        "processando"
+                    )
+                    resultado = await self.conversa.processar_mensagem(mensagem)
+                    
+                    if resultado["tipo"] == "sucesso":
+                        self.streaming.atualizar_ultimo_estado("sucesso")
+                    else:
+                        self.streaming.atualizar_ultimo_estado("erro")
             else:
                 self.streaming.atualizar_ultimo_estado(
                     "sucesso",

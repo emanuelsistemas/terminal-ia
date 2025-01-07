@@ -12,6 +12,7 @@ class ComandoAgent:
     
     async def is_comando(self, mensagem: str) -> bool:
         """Verifica se a mensagem é um comando"""
+        # Se estamos aguardando resposta ou a mensagem começa com /
         return mensagem.startswith("/") or self.estado_comando.get("aguardando_resposta")
     
     async def analisar_comando(self, mensagem: str) -> Dict:
@@ -51,6 +52,12 @@ class ComandoAgent:
                         }
             
             # Se é um novo comando
+            if not mensagem.startswith("/"):
+                return {
+                    "tipo": "erro",
+                    "resposta": "❌ Comando inválido. Use /help para ver os comandos disponíveis."
+                }
+            
             partes = mensagem.split()
             comando = partes[0].lower()
             
@@ -116,10 +123,10 @@ class ComandoAgent:
                     "resposta": f"✅ {'Arquivo' if comando == '/touch' else 'Diretório'} {partes[1]} criado"
                 }
             
-            # Se não é um comando conhecido, retorna erro
+            # Se não é um comando conhecido
             return {
                 "tipo": "erro",
-                "resposta": f"❌ Comando não reconhecido. Use /help para ver os comandos disponíveis."
+                "resposta": "❌ Comando não reconhecido. Use /help para ver os comandos disponíveis."
             }
             
         except Exception as e:
