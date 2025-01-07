@@ -27,12 +27,15 @@ class ConversaAgent:
                     Sempre mantenha o contexto do projeto atual.
                     
                     Comandos disponíveis:
-                    /projeto <nome> - Cria um novo projeto
+                    /projeto - Cria um novo projeto
                     /cd <caminho> - Navega entre diretórios
                     /touch <arquivo> - Cria um arquivo
                     /mkdir <diretório> - Cria um diretório
                     
-                    Responda em português do Brasil."""
+                    Responda em português do Brasil.
+                    
+                    Se o usuário mencionar um caminho ou pasta, sugira usar o comando apropriado.
+                    Por exemplo, se ele disser 'crie na pasta /root/projetos', responda sugerindo usar o comando /projeto."""
                 }
             ]
             

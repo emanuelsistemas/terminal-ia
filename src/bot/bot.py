@@ -34,6 +34,9 @@ class Bot:
     async def mensagem(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Processa mensagens normais"""
         try:
+            # Envia mensagem de digitando
+            await update.message.chat.send_chat_action("typing")
+            
             # Processa a mensagem
             resultado = await self.orquestrador.processar_mensagem(
                 update.message.text,
@@ -43,12 +46,17 @@ class Bot:
             # Se tiver streaming, envia primeiro
             if "streaming" in resultado:
                 await update.message.reply_text(
-                    f"```\n{resultado['streaming']}\n```",
-                    parse_mode="Markdown"
+                    resultado["streaming"],
+                    parse_mode=None  # Desativa o parse mode para não interferir com os emojis
                 )
             
-            # Envia a resposta
-            await update.message.reply_text(resultado["resposta"])
+            # Envia a resposta principal
+            if resultado["tipo"] == "pergunta":
+                # Se for uma pergunta, envia só a pergunta
+                await update.message.reply_text(resultado["resposta"])
+            elif resultado["tipo"] == "sucesso" or resultado["tipo"] == "erro":
+                # Se for sucesso ou erro, envia a resposta completa
+                await update.message.reply_text(resultado["resposta"])
             
         except Exception as e:
             logger.error(f"Erro ao processar mensagem: {e}")
