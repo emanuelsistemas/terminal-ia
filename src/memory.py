@@ -26,7 +26,8 @@ class Memory:
         self.short_term: Dict[int, List[Dict]] = {}
         
         # URL para pesquisa web
-        self.search_url = "https://ddg-api.herokuapp.com/search"
+        self.search_url = "https://serpapi.com/search"
+        self.serpapi_key = "sua_chave_aqui"  # Você precisará de uma chave da SerpAPI
         
         logger.info("Sistema de memória inicializado")
     
@@ -48,17 +49,30 @@ class Memory:
             oldest = self.short_term[chat_id].pop(0)
             self._add_to_long_term(chat_id, oldest)
     
-    async def get_context(self, chat_id: int, query: str) -> Dict:
+    def get_context(self, chat_id: int, query: str) -> Dict:
         """Obtém o contexto relevante para uma query, seguindo a hierarquia:
         1. Memória curta (últimas 10 mensagens)
         2. ChromaDB (memória longa)
-        3. Pesquisa web (último recurso)
+        3. Informações em tempo real (data, hora, etc)
+        4. Pesquisa web (último recurso)
         """
         response = {
-            "source": None,  # short_term, long_term ou web
+            "source": None,  # short_term, long_term, realtime ou web
             "context": [],
             "found": False
         }
+        
+        # Verifica se é uma pergunta sobre data/hora
+        if self._is_datetime_query(query):
+            now = datetime.now()
+            response["source"] = "realtime"
+            response["context"] = [{
+                "role": "system",
+                "content": f"Informação em tempo real: Hoje é {now.strftime('%d/%m/%Y')} às {now.strftime('%H:%M')}.",
+                "timestamp": now.isoformat()
+            }]
+            response["found"] = True
+            return response
         
         # 1. Primeiro tenta na memória de curto prazo
         if chat_id in self.short_term:
@@ -78,7 +92,7 @@ class Memory:
             return response
         
         # 3. Se ainda não encontrar, tenta buscar na web
-        web_results = await self._search_web(query)
+        web_results = self._search_web(query)
         if web_results:
             response["source"] = "web"
             response["context"] = web_results
@@ -87,6 +101,15 @@ class Memory:
         
         # Se não encontrar nada, retorna vazio
         return response
+    
+    def _is_datetime_query(self, query: str) -> bool:
+        """Verifica se a query é sobre data ou hora"""
+        datetime_keywords = [
+            "que dia", "qual dia", "data", "hora", "que horas",
+            "qual a data", "dia de hoje", "hora atual"
+        ]
+        query = query.lower()
+        return any(keyword in query for keyword in datetime_keywords)
     
     def _is_relevant(self, query: str, context: List[Dict]) -> bool:
         """Verifica se o contexto recente é relevante para a query"""
@@ -147,25 +170,51 @@ class Memory:
             logger.error(f"Erro ao buscar na memória de longo prazo: {e}")
             return []
     
-    async def _search_web(self, query: str, max_results: int = 3) -> List[Dict]:
+    def _search_web(self, query: str) -> List[Dict]:
         """Realiza uma pesquisa web como último recurso"""
         try:
+            # Primeiro tenta com DuckDuckGo
+            ddg_url = "https://ddg-api.herokuapp.com/search"
             response = requests.get(
-                self.search_url,
-                params={"query": query, "limit": max_results}
+                ddg_url,
+                params={"query": query, "limit": 3}
             )
-            results = response.json()
             
-            # Formata para o mesmo padrão das outras fontes
-            messages = []
-            for result in results:
-                messages.append({
-                    "role": "system",
-                    "content": f"Título: {result.get('title')}\n\nConteúdo: {result.get('snippet')}\n\nFonte: {result.get('link')}",
-                    "timestamp": datetime.now().isoformat()
-                })
+            if response.status_code == 200:
+                results = response.json()
+                messages = []
+                for result in results:
+                    messages.append({
+                        "role": "system",
+                        "content": f"Segundo {result.get('link')}: {result.get('snippet')}",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                return messages
             
-            return messages
+            # Se falhar, tenta com Google (requer API key)
+            if self.serpapi_key != "sua_chave_aqui":
+                response = requests.get(
+                    self.search_url,
+                    params={
+                        "q": query,
+                        "api_key": self.serpapi_key,
+                        "engine": "google"
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    organic_results = data.get("organic_results", [])
+                    messages = []
+                    for result in organic_results[:3]:
+                        messages.append({
+                            "role": "system",
+                            "content": f"Segundo {result.get('link')}: {result.get('snippet')}",
+                            "timestamp": datetime.now().isoformat()
+                        })
+                    return messages
+            
+            return []
             
         except Exception as e:
             logger.error(f"Erro ao realizar pesquisa web: {e}")
